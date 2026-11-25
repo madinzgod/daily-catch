@@ -1203,6 +1203,20 @@ function drawKitchen(ctx, state) {
   ctx.beginPath(); ctx.arc(1200, 548, 8.5, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#a5dd8f';
   ctx.beginPath(); ctx.arc(1197, 545, 4, 0, Math.PI * 2); ctx.fill();
+  // A coiled rope on the floor beside the crates (AUDIT-V20 E1 —
+  // V19's D15, planned there and dropped): three turns of harbour
+  // rope and a loose end, in the bare corner the crates stand in.
+  ctx.fillStyle = 'rgba(74,44,16,0.15)';
+  ctx.beginPath(); ctx.ellipse(1124, 678, 21, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#b08d57';
+  ctx.lineWidth = 4.4;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.ellipse(1124, 672, 17, 5.5, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(1124, 669.5, 11.5, 3.8, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(1124, 667.5, 6, 2.2, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = '#96754a';
+  ctx.lineWidth = 3.4;
+  ctx.beginPath(); ctx.moveTo(1139, 675); ctx.quadraticCurveTo(1148, 680, 1153, 686); ctx.stroke();
 
   // The island's own shadow on the rug, cast before any counter is drawn:
   // a heavy table stands ON the mat and shades it — the island used to sit
@@ -1242,19 +1256,21 @@ function drawKitchen(ctx, state) {
       // below, a front face with real thickness under the top — all paint
       // inside and below the existing footprint; the station rect and
       // every solid are byte-identical, so no route in the room moved.
+      // V20 deepens the face a step (34 → 40) and the legs follow it
+      // down: the band read thin against the wide top (AUDIT-V20 I1).
       ctx.fillStyle = '#5d4830';
-      rr(ctx, station.x + 44, station.y + 104, 22, 26, 3); ctx.fill();
-      rr(ctx, station.x + 314, station.y + 104, 22, 26, 3); ctx.fill();
-      rr(ctx, station.x + 44, station.y + 120, 292, 7, 3); ctx.fill();
+      rr(ctx, station.x + 44, station.y + 110, 22, 26, 3); ctx.fill();
+      rr(ctx, station.x + 314, station.y + 110, 22, 26, 3); ctx.fill();
+      rr(ctx, station.x + 44, station.y + 126, 292, 7, 3); ctx.fill();
       ctx.fillStyle = '#7d6240';
-      rr(ctx, station.x + 3, station.y + 78, station.w - 6, 34, 6); ctx.fill();
+      rr(ctx, station.x + 3, station.y + 78, station.w - 6, 40, 6); ctx.fill();
       ctx.strokeStyle = 'rgba(60,44,26,0.5)';
       ctx.lineWidth = 1.2;
       for (const px of [station.x + 95, station.x + 190, station.x + 285]) {
-        ctx.beginPath(); ctx.moveTo(px, station.y + 82); ctx.lineTo(px, station.y + 108); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(px, station.y + 82); ctx.lineTo(px, station.y + 114); ctx.stroke();
       }
       ctx.fillStyle = 'rgba(60,44,26,0.35)';
-      ctx.fillRect(station.x + 7, station.y + 106, station.w - 14, 4);
+      ctx.fillRect(station.x + 7, station.y + 112, station.w - 14, 4);
       ctx.fillStyle = COLORS.driftwood;
       rr(ctx, station.x + 3, station.y + 3, station.w - 6, station.h - 6, 7); ctx.fill();
       // The top slab's front rim catches the light: one bright line along
@@ -1576,11 +1592,15 @@ function drawKitchen(ctx, state) {
         for (let i = 0; i < slips; i++) {
           ctx.save();
           ctx.translate(700, 740 - i * 2.4);
-          ctx.rotate((i % 2 ? 1 : -1) * 0.09);
+          ctx.rotate((i % 2 ? 1 : -1) * 0.15);
           ctx.fillStyle = '#fdf6e3';
-          ctx.fillRect(-6.5, -4.5, 13, 9);
+          ctx.fillRect(-7.5, -5.5, 15, 11);
+          // The tickets' own red header stripe, so the filed slips
+          // read as the board's paper and not a white candle
+          // (AUDIT-V20 S1f).
           ctx.fillStyle = '#d84a2f';
-          ctx.beginPath(); ctx.arc(0, 0, 1.3, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(-7.5, -5.5, 15, 2.8);
+          ctx.beginPath(); ctx.arc(0, 0.5, 1.3, 0, Math.PI * 2); ctx.fill();
           ctx.restore();
         }
       }
@@ -1842,6 +1862,18 @@ function drawGuestFigure(ctx, state, g, slideY, alpha) {
   const feetY = g.feetY + slideY;
   ctx.save();
   if (alpha < 1) ctx.globalAlpha = alpha;
+  // A contact shadow under the shoes, in the room's own shadow
+  // language: every other figure and dish carries one, and without
+  // it the guests read as stickers on the window (AUDIT-V20 G2).
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.beginPath(); ctx.ellipse(x, feetY - 1, 15, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+  // Drawn up a step, about the feet: at their first size the guests
+  // stood two-thirds the cook's height — half-size people at his
+  // window (AUDIT-V20 G1). The build is the guest's own, fixed by
+  // their ticket, so the row is a crowd, not a set of clones. Feet,
+  // slots and departure geometry do not move.
+  const gs = 1.10 * (g.look.build || 1);
+  ctx.translate(x, feetY); ctx.scale(gs, gs); ctx.translate(-x, -feetY);
   // Legs and shoes.
   ctx.fillStyle = '#3a3f42';
   rr(ctx, x - 7.5, feetY - 14, 6.5, 12, 2); ctx.fill();
@@ -1898,23 +1930,23 @@ function drawGuestFigure(ctx, state, g, slideY, alpha) {
   // The face: the ticket's own timer, in features. Content above half,
   // flat to a quarter, cross below it — the board's 0.25 threshold.
   ctx.fillStyle = '#22382e';
-  ctx.beginPath(); ctx.arc(x - 3.2, feetY - 53, 1.05, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + 3.2, feetY - 53, 1.05, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x - 3.2, feetY - 53, 1.3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 3.2, feetY - 53, 1.3, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = '#22382e';
-  ctx.lineWidth = 1.1;
+  ctx.lineWidth = 1.35;
   ctx.lineCap = 'round';
   if (g.mood === 'content') {
     ctx.beginPath(); ctx.arc(x - 3.2, feetY - 55.4, 2.1, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
     ctx.beginPath(); ctx.arc(x + 3.2, feetY - 55.4, 2.1, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x, feetY - 49.6, 2.6, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, feetY - 49.6, 3.0, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
   } else if (g.mood === 'flat') {
     ctx.beginPath(); ctx.moveTo(x - 5.2, feetY - 56.8); ctx.lineTo(x - 1.2, feetY - 56.8); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x + 1.2, feetY - 56.8); ctx.lineTo(x + 5.2, feetY - 56.8); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x - 2.4, feetY - 47.6); ctx.lineTo(x + 2.4, feetY - 47.6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 2.8, feetY - 47.6); ctx.lineTo(x + 2.8, feetY - 47.6); ctx.stroke();
   } else {
     ctx.beginPath(); ctx.moveTo(x - 5.4, feetY - 57.6); ctx.lineTo(x - 1.2, feetY - 55.8); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x + 5.4, feetY - 57.6); ctx.lineTo(x + 1.2, feetY - 55.8); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x, feetY - 44.9, 2.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, feetY - 44.9, 2.8, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
   }
   ctx.restore();
 }
@@ -2101,8 +2133,13 @@ function drawChef(ctx, state) {
     ctx.strokeStyle = '#f0bd8f';
     ctx.lineWidth = 1.6;
     if (chef.carry) {
-      ctx.beginPath(); ctx.moveTo(hx - 2, hy - 2); ctx.lineTo(hx - 2.6, hy - 6); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(hx + 2, hy - 2); ctx.lineTo(hx + 2.6, hy - 6); ctx.stroke();
+      // A dish rides as a tray with the palms under its rim; an
+      // ingredient rides higher, and its grip fingers reach further
+      // to close on its underside — at the tray's grip length they
+      // stopped short and the food hovered, unheld (AUDIT-V20 C1).
+      const grip = carryDish ? 6 : 10;
+      ctx.beginPath(); ctx.moveTo(hx - 2, hy - 2); ctx.lineTo(hx - 2.6, hy - grip); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(hx + 2, hy - 2); ctx.lineTo(hx + 2.6, hy - grip); ctx.stroke();
     } else {
       ctx.beginPath(); ctx.moveTo(hx - 1.8, hy + 2); ctx.lineTo(hx - 2.2, hy + 5.5); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(hx + 1.8, hy + 2); ctx.lineTo(hx + 2.2, hy + 5.5); ctx.stroke();
@@ -2261,7 +2298,14 @@ function drawChef(ctx, state) {
   if (chef.carry) {
     const dish = DISHES[chef.carry];
     if (dish) drawDish(ctx, chef.carry, x, y - 62, 66, false);
-    else drawItem(ctx, chef.carry, x, y - 74, 46, false);
+    else {
+      // The ingredient shades the toque it hovers over: a held thing
+      // casts a shadow, and without one the food floats above the
+      // hat like a balloon (AUDIT-V20 C1).
+      ctx.fillStyle = 'rgba(90,70,40,0.13)';
+      ctx.beginPath(); ctx.ellipse(x, y - 47.5, 12.5, 2.8, 0, 0, Math.PI * 2); ctx.fill();
+      drawItem(ctx, chef.carry, x, y - 74, 46, false);
+    }
   }
   ctx.restore();
 }
@@ -2322,6 +2366,11 @@ function drawBoard(ctx, state) {
       rr(ctx, x, y, cardW, h, 7); ctx.stroke();
     }
     const main = ticket.items[0];
+    // Today's catch wears its star on its tickets too (AUDIT-V20
+    // E2): a brass marker tab on the card's left edge when the
+    // ticket's main dish is the shift's special — the featured dish
+    // reads where the route is planned, not only on the boards.
+    if (main.dish === state.special) drawStar(ctx, x + 1, y + 43, 4.6, '#c99635');
     drawDish(ctx, main.dish, x + 36, y + 33, 54);
     if (main.done) {
       // A served main wears a paper disc with a drawn check on it — the

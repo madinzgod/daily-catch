@@ -42,6 +42,7 @@ export function guestLook(id) {
     skin: SKINS[(h >>> 3) % SKINS.length],
     hair: HAIRS[(h >>> 5) % HAIRS.length],
     style: (h >>> 7) % 4, // 0 cap, 1 bun, 2 curls, 3 bald with a beard
+    build: 0.96 + ((h >>> 9) % 3) * 0.04, // stature, 0.96–1.04 (AUDIT-V20 G1)
   };
 }
 
