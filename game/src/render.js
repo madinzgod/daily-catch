@@ -3,7 +3,7 @@
 // Nothing here changes the game — it only reads the state and draws it.
 
 import { BOARD_H, COLORS, FRYER_BURN, FRYER_COOK, GRILL_BURN, GRILL_COOK, SOLIDS, STATIONS, VIEW } from './config.js';
-import { DISHES, COOKED, RECIPES, recipeForStack } from './recipes.js';
+import { DISHES, COOKED, FRIES, INGREDIENTS, RECIPES, recipeForStack } from './recipes.js';
 import { nearestStation } from './actions.js';
 
 const FONT = "'Trebuchet MS', 'Segoe UI', Verdana, sans-serif";
@@ -1068,32 +1068,67 @@ function drawBoard(ctx, state) {
   text(ctx, `SERVED ${state.served}`, hx, 90, 13, '#9fb4ac', 'left', false);
 }
 
+/** A chalkboard panel in the specials board's own style: wood frame, dark green board. */
+function chalkPanel(ctx, x, y, w, h) {
+  ctx.fillStyle = '#5f4f3c';
+  rr(ctx, x, y, w, h, 8); ctx.fill();
+  ctx.fillStyle = '#22382e';
+  rr(ctx, x + 6, y + 6, w - 12, h - 12, 5); ctx.fill();
+}
+
 function drawOverlays(ctx, state) {
   if (state.phase === 'play') return;
   ctx.fillStyle = 'rgba(23, 32, 36, 0.78)';
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
   const cx = VIEW.width / 2;
   if (state.phase === 'title') {
-    text(ctx, 'THE DAILY CATCH', cx, 218, 80, '#ffd968');
-    text(ctx, 'one cook, one harbour kitchen, the whole lunch rush', cx, 272, 22, COLORS.cream, 'center', false);
-    text(ctx, 'Orders land on the board. You are the whole kitchen: fetch, chop, grill, fry,', cx, 330, 18, '#cfe0d8', 'center', false);
-    text(ctx, 'plate and serve before each ticket’s timer dies. Tips grow with time to spare.', cx, 356, 18, '#cfe0d8', 'center', false);
-    text(ctx, 'MOVE  WASD / arrows (or click)      WORK  SPACE      START  ENTER', cx, 404, 17, COLORS.mustard);
-    text(ctx, 'ON THE MENU', cx, 452, 15, '#9fb4ac');
-    RECIPES.forEach((recipe, i) => {
-      const y = 484 + i * 30;
-      drawDish(ctx, recipe.id, cx - 190, y, 44);
-      text(ctx, `${recipe.name} — $${recipe.price}`, cx - 160, y, 16.5, COLORS.cream, 'left', false);
+    text(ctx, 'THE DAILY CATCH', cx, 152, 70, '#ffd968');
+    text(ctx, 'one cook, one harbour kitchen, the whole lunch rush', cx, 196, 20, COLORS.cream, 'center', false);
+    // The menu board: every dish the kitchen serves, what goes into it and what
+    // it pays — the game's depth, chalked up where a judge can read it.
+    chalkPanel(ctx, 235, 222, 810, 322);
+    text(ctx, 'ON THE MENU', cx, 250, 16, COLORS.mustard);
+    const menuNotes = {
+      fillet: 'straight off the grill — the quick one',
+      fries: 'cut potato, from the fryer — rides along on combo tickets',
+    };
+    [...RECIPES, FRIES].forEach((dish, i) => {
+      const y = 288 + i * 40;
+      drawDish(ctx, dish.id, 302, y, 40);
+      text(ctx, dish.name, 334, y - 8, 15.5, COLORS.cream, 'left');
+      const parts = menuNotes[dish.id]
+        || dish.items.map((item) => INGREDIENTS[item].name.toLowerCase()).join(' + ');
+      text(ctx, parts, 334, y + 11, 12, '#9fb4ac', 'left', false);
+      text(ctx, `$${dish.price}`, 1013, y - 2, 16.5, '#ffd968', 'right');
     });
-    text(ctx, '…plus fries from the fryer, and combo tickets that want both.', cx, 484 + RECIPES.length * 30 + 8, 15.5, '#9fb4ac', 'center', false);
-    text(ctx, 'PRESS ENTER — FIRST SHIFT', cx, 700, 21, '#7dff9a');
+    text(ctx, 'Combo tickets pair a plate with chips — one route, two lines, a bigger tip.', cx, 526, 13, '#9fb4ac', 'center', false);
+    text(ctx, 'HOW TO PLAY — FETCH from the bins → CHOP at the boards → GRILL / FRY → PLATE → SERVE', cx, 574, 16.5, COLORS.mustard);
+    text(ctx, 'Serve every ticket before its timer dies — tips grow with time to spare, a walkout costs $4.', cx, 600, 14, '#cfe0d8', 'center', false);
+    text(ctx, 'MOVE  WASD / arrows (or click)      WORK  SPACE', cx, 628, 15, COLORS.mustard);
+    text(ctx, 'PRESS ENTER — FIRST SHIFT', cx, 660, 20, '#7dff9a');
   } else {
-    text(ctx, 'LAST ORDERS — SHIFT OVER', cx, 240, 46, '#ffd968');
-    text(ctx, `You took $ ${state.score}`, cx, 312, 30, COLORS.cream);
-    text(ctx, `Dishes served ${state.served}      Walkouts ${state.walkouts}      Best tip $ ${state.bestTip}`, cx, 362, 19, '#cfe0d8', 'center', false);
-    const grade = state.score >= 220 ? 'EXECUTIVE CHEF' : state.score >= 160 ? 'SOUS CHEF' : state.score >= 100 ? 'LINE COOK' : state.score >= 40 ? 'KITCHEN HAND' : 'DISH PIG (AFFECTIONATE)';
-    text(ctx, `Kitchen grade: ${grade}`, cx, 414, 21, COLORS.mustard);
-    text(ctx, 'PRESS R TO WORK ANOTHER SHIFT', cx, 480, 18, '#7dff9a');
+    text(ctx, 'LAST ORDERS — SHIFT OVER', cx, 184, 44, '#ffd968');
+    text(ctx, `You took $ ${state.score}`, cx, 238, 29, COLORS.cream);
+    // The shift's story, dish by dish: what actually went out of the kitchen,
+    // counted line by line as it was served.
+    chalkPanel(ctx, 290, 264, 700, 196);
+    text(ctx, 'SERVED THIS SHIFT', cx, 288, 13.5, '#9fb4ac');
+    [...RECIPES, FRIES].forEach((dish, i) => {
+      const colX = i < 3 ? 480 : 800;
+      const y = 326 + (i % 3) * 42;
+      const n = state.servedBy[dish.id] || 0;
+      drawDish(ctx, dish.id, colX - 82, y, 40);
+      text(ctx, `${dish.name} ×${n}`, colX - 56, y, 15.5, n > 0 ? COLORS.cream : '#71827a', 'left', false);
+    });
+    text(ctx, `Dishes served ${state.served}      Walkouts ${state.walkouts}      Best tip $ ${state.bestTip}`, cx, 490, 17.5, '#cfe0d8', 'center', false);
+    const [letter, title] = state.score >= 250 ? ['S', 'EXECUTIVE CHEF']
+      : state.score >= 200 ? ['A', 'EXECUTIVE CHEF']
+      : state.score >= 150 ? ['B', 'SOUS CHEF']
+      : state.score >= 100 ? ['C', 'LINE COOK']
+      : state.score >= 50 ? ['D', 'KITCHEN HAND']
+      : ['E', 'DISH PIG (AFFECTIONATE)'];
+    text(ctx, `KITCHEN GRADE: ${letter} — ${title}`, cx, 532, 22, COLORS.mustard);
+    text(ctx, 'PRESS R TO WORK ANOTHER SHIFT', cx, 578, 17, '#7dff9a');
   }
 }
 

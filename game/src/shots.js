@@ -91,6 +91,8 @@ function end() {
   s.phase = 'over';
   s.score = 236;
   s.served = 14;
+  // Fourteen tickets, three of them combos: fourteen plates plus three chips.
+  s.servedBy = { fillet: 2, salad: 2, butty: 4, harbour: 4, prawns: 2, fries: 3 };
   s.walkouts = 1;
   s.bestTip = 9;
   s.shiftLeft = 0;

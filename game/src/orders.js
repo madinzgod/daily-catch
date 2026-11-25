@@ -44,6 +44,7 @@ export function serveDish(state, dishId) {
     const line = ticket.items.find((i) => i.dish === dishId && !i.done);
     if (!line) continue;
     line.done = true;
+    state.servedBy[dishId] = (state.servedBy[dishId] || 0) + 1;
     if (ticket.items.every((i) => i.done)) {
       const tip = Math.round(ticket.price * 0.5 * (ticket.timeLeft / ticket.timeTotal));
       state.score += ticket.price + tip;

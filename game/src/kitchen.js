@@ -12,6 +12,7 @@ export function createGame(seed) {
     shiftLeft: SHIFT_SECONDS,
     score: 0,
     served: 0,
+    servedBy: {}, // dish id -> lines handed over: the shift's story, dish by dish
     walkouts: 0,
     bestTip: 0,
     chef: { x: 640, y: 596, face: 1, carry: null, walk: 0 },
