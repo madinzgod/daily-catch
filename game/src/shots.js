@@ -63,7 +63,11 @@ function cover() {
   s.chef.x = 560;
   s.chef.y = 636;
   s.chef.carry = 'tomato_cut'; // the very piece the Harbour Plate is missing
-  s.popups = [{ x: 1052, y: 600, text: '+$16', color: '#1f7a6d', t: 0.4, life: 1.4 }];
+  // The serve popup rests just above the window that paid it, in its
+  // own early-rise zone: staged at (1052, 600) it floated over the
+  // empty right walkway, the one popup on the sheet with no visible
+  // cause (AUDIT-V18 W5).
+  s.popups = [{ x: 1062, y: 648, text: '+$16', color: '#1f7a6d', t: 0.4, life: 1.4 }];
   return s;
 }
 

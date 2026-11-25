@@ -503,8 +503,10 @@ function drawPlateSpread(ctx, items, x, y, s) {
   const slots = items.length >= 3 ? [[-29, 1], [0, -6], [29, 1]]
     : items.length === 2 ? [[-28, 0], [28, 0]]
     : [[-16, 0]];
-  items.forEach((item, i) => drawItem(ctx, item, slots[i][0], slots[i][1], 44));
   if (items.length < 3) {
+    // The dashed ring marks the empty place, so it is drawn on the
+    // plate, under the food: drawn after the items, its arc struck
+    // through the fillet's tail on the cover (AUDIT-V18 W10).
     const gap = items.length === 2 ? [0, 12] : [26, 1];
     ctx.strokeStyle = 'rgba(20,84,75,0.8)';
     ctx.lineWidth = 2.2;
@@ -512,6 +514,7 @@ function drawPlateSpread(ctx, items, x, y, s) {
     ctx.beginPath(); ctx.arc(gap[0], gap[1], 14, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
   }
+  items.forEach((item, i) => drawItem(ctx, item, slots[i][0], slots[i][1], 44));
   ctx.restore();
 }
 
@@ -663,7 +666,7 @@ function drawMidChop(ctx, item, chops, x, y, s) {
  * a deep, saturated oil bath, so the fryer at work reads as frying, not as a
  * letter — and not, at the sheet's size, as a row of pale candles.
  */
-function drawFryerCooking(ctx, cx, cy) {
+function drawFryerCooking(ctx, cx, cy, warm) {
   const oilY = cy + 13;
   // The batons, back row first: varied heights and leans, hash-placed so the
   // arrangement never moves between frames.
@@ -683,7 +686,14 @@ function drawFryerCooking(ctx, cx, cy) {
     ctx.restore();
   };
   const sticks = [[-40, 30, -0.16], [-27, 38, -0.06], [-13, 33, 0.08], [1, 41, -0.02], [15, 35, 0.12], [28, 39, 0.05], [41, 29, 0.17]];
-  for (const [ox, h, rot] of sticks) baton(ox, h, rot, '#f0cd78', '#d9ae4e', '#bd9440');
+  // Half-cooked, the batons warm one step toward the finished chips'
+  // gold — the food itself says time is passing, not only the bar
+  // under it (AUDIT-V18 W7). The finished carton is still a step
+  // beyond: this is a midpoint, not the finish.
+  for (const [ox, h, rot] of sticks) {
+    if (warm) baton(ox, h, rot, '#f3c95f', '#dbab42', '#b98f36');
+    else baton(ox, h, rot, '#f0cd78', '#d9ae4e', '#bd9440');
+  }
   // The oil itself, drawn over the batons' feet: a deep, hot gold bath with a
   // brighter, broken surface — dark enough, against the fryer's panel, that
   // the pale batons read as food in oil and not as sticks in a void.
@@ -750,13 +760,20 @@ function drawMachine(ctx, state, station, machine) {
     // In the fryer, raw cut potato gets its own cooking scene (batons in
     // bubbling oil); on the grill, prawns get their spaced row; everywhere
     // else the item itself is the picture.
-    if (kind === 'fryer' && machine.t < cookAt) drawFryerCooking(ctx, cx, cy);
+    if (kind === 'fryer' && machine.t < cookAt) drawFryerCooking(ctx, cx, cy, machine.t >= cookAt / 2);
     else if (kind === 'grill' && shown.startsWith('prawns')) drawGrillPrawns(ctx, shown, cx, cy);
     // The grill's single item steps up a size: at 54 its body spanned
     // ~51 px of a 174 px-wide dark panel and read as a small dark mark
     // at the cover's size; the prawns already span the grill in a row.
     else drawItem(ctx, shown, cx, cy - 4, kind === 'grill' ? 62 : 52);
-    const color = machine.t >= burnAt ? COLORS.red : machine.t >= cookAt ? COLORS.timerGood : COLORS.mustard;
+    // The bar is the clock, the badge below is the food's state: the bar
+    // fills toward the burn point, and its final stretch turns red —
+    // "nearly out of time", the same language the tickets' draining
+    // bars speak — while the badge stays READY! green until BURNT!
+    // replaces it. At its old colours the bar sat green at 94% of the
+    // burn window, 0.6 s from burnt (AUDIT-V18 W8).
+    const color = machine.t >= burnAt || machine.t / burnAt >= 0.85 ? COLORS.red
+      : machine.t >= cookAt ? COLORS.timerGood : COLORS.mustard;
     drawProgress(ctx, station.x + 16, station.y + station.h - 20, station.w - 32, machine.t / burnAt, color);
     // Steam wisps, swaying with the clock so the frame feels alive — three of
     // them, tall enough to read above both machines at contact-sheet size.
@@ -868,6 +885,15 @@ function drawKitchen(ctx, state) {
     ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + 11 + hash2(i, 41) * 10, wy); ctx.stroke();
   }
   ctx.restore();
+  // The mat's stitched border: a dashed ring just inside the rim, in
+  // the dark weave tone — a mat's edge finished the way the apron's
+  // pocket is stitched (AUDIT-V18 B5). Dashes, dark, at the rim: it
+  // is a stitch line, not a third ring.
+  ctx.strokeStyle = 'rgba(122,52,28,0.35)';
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([7, 6]);
+  ctx.beginPath(); ctx.ellipse(640, 460, 256, 90, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
   // Counters.
   for (const solid of SOLIDS) {
     ctx.fillStyle = COLORS.counter;
@@ -952,6 +978,14 @@ function drawKitchen(ctx, state) {
   ctx.strokeStyle = 'rgba(255,255,255,0.4)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(179, 724.6); ctx.lineTo(319, 724.6); ctx.stroke();
+  // A second boat, far away on the horizon in the right pane: a low
+  // hull and one small sail in the headland's own tone — the depth's
+  // third layer, traffic on the horizon (AUDIT-V18 B2).
+  ctx.fillStyle = 'rgba(39,75,82,0.55)';
+  ctx.beginPath();
+  ctx.moveTo(276, 721.5); ctx.lineTo(293, 721.5); ctx.lineTo(290, 724.6); ctx.lineTo(279, 724.6);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(284.5, 713); ctx.lineTo(284.5, 721); ctx.lineTo(290.5, 721); ctx.closePath(); ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.5)';
   ctx.lineWidth = 1.2;
   for (const [wx, wy] of [[196, 734], [226, 743], [286, 737], [306, 747]]) {
@@ -984,6 +1018,15 @@ function drawKitchen(ctx, state) {
   ctx.fillStyle = COLORS.red;
   ctx.beginPath(); ctx.moveTo(220, 712); ctx.lineTo(228, 714.4); ctx.lineTo(220, 716.8); ctx.closePath(); ctx.fill();
   ctx.restore();
+  // The boat's wake: two short strokes fanning from the stern and a
+  // shimmer line under the hull — the harbour's one moving thing,
+  // moving (AUDIT-V18 B1). In window space: the hull's stern sits at
+  // ≈ (192, 738) after its 1.3 growth about (219, 725).
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(193, 736.5); ctx.lineTo(181, 741.5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(193, 739.5); ctx.lineTo(181, 734.5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(204, 746.5); ctx.lineTo(218, 746.5); ctx.stroke();
   // Gulls: three small double-arcs over the water, and one smaller,
   // farther pair toward the sun — the sky has depth like the sea does.
   ctx.strokeStyle = '#33555e';
@@ -1310,6 +1353,13 @@ function drawKitchen(ctx, state) {
       const board = state.boards.find((b) => b.station === station);
       ctx.fillStyle = '#d9b77c';
       rr(ctx, station.x + 12, station.y + 12, station.w - 24, station.h - 34, 6); ctx.fill();
+      // The board's edge, in the island prep board's own stroke: every
+      // other cutting surface in the room carries one, and without it
+      // the pale board read as a sheet of paper laid on the counter
+      // (AUDIT-V18 W9).
+      ctx.strokeStyle = '#b8934f';
+      ctx.lineWidth = 1.3;
+      rr(ctx, station.x + 12, station.y + 12, station.w - 24, station.h - 34, 6); ctx.stroke();
       if (board.item) {
         const need = { tomato: 3, lettuce: 2, potato: 3 }[board.item];
         if (need && board.chops >= need) {
@@ -1383,6 +1433,17 @@ function drawKitchen(ctx, state) {
         ctx.fillStyle = i % 2 ? '#fff7e6' : COLORS.red;
         ctx.fillRect(station.x + 8 + i * ((station.w - 16) / 9), station.y + 6, (station.w - 16) / 9, 12);
       }
+      // A scalloped hem along the awning's bottom edge, one shallow
+      // half-ellipse per stripe in the stripe's own colour — the
+      // harbour-café finish the stripes promised (AUDIT-V18 B4).
+      // Shallow (6 deep) so the hem stays clear of the label's row.
+      for (let i = 0; i < 9; i++) {
+        const sw = (station.w - 16) / 9;
+        ctx.fillStyle = i % 2 ? '#fff7e6' : COLORS.red;
+        ctx.beginPath();
+        ctx.ellipse(station.x + 8 + i * sw + sw / 2, station.y + 18, sw / 2, 6, 0, 0, Math.PI);
+        ctx.fill();
+      }
       text(ctx, 'SERVE — dishes out here', cx, station.y + 30, 13, '#22382e');
       if (state.passDish) {
         // The pass moment, drawn at the plating counter's presence: a finished
@@ -1400,16 +1461,18 @@ function drawKitchen(ctx, state) {
         // Steam over the pass: the machines steam and the sheet's
         // "ready to serve" moment sat cold. Two wisps in the machines'
         // own language rise off the finished dish, swaying with the
-        // clock like theirs do.
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-        ctx.lineWidth = 2.3;
+        // clock like theirs do. At the machines' own strength they
+        // vanished over the serve counter's pale glass, though — the
+        // pass wears a stronger literal of its own (AUDIT-V18 W4).
+        ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+        ctx.lineWidth = 2.6;
         ctx.lineCap = 'round';
         for (const off of [-13, 13]) {
           const sx = station.x + (friesPass ? 58 : 74) + off + Math.sin(state.time * 2.2 + off * 1.7) * 3;
           const sy = station.y + (friesPass ? 30 : 26);
           ctx.beginPath();
           ctx.moveTo(sx, sy);
-          ctx.quadraticCurveTo(sx + 5, sy - 11, sx - 1, sy - 21);
+          ctx.quadraticCurveTo(sx + 6, sy - 15, sx - 1, sy - 27);
           ctx.stroke();
         }
         drawBadge(ctx, station.x + 208, station.y + 50, 'READY TO SERVE!', '#1e7d46');
@@ -1499,9 +1562,12 @@ function drawChef(ctx, state) {
   // cook is its only character — at his old size he read as a token on the
   // floor instead of the person working it. The scale pivots on his feet,
   // so he grows upward from where he stands; nothing mechanical reads it.
+  // V18 steps him up once more (1.15 → 1.25): at the judge's size his
+  // face is ~11 px and the strain read still rests on the red ticket —
+  // presence is the step the detail pass left (AUDIT-V18 W6).
   ctx.save();
   ctx.translate(chef.x, chef.y + 27);
-  ctx.scale(1.15, 1.15);
+  ctx.scale(1.25, 1.25);
   ctx.translate(-chef.x, -(chef.y + 27));
   // The cook's face answers the pressure on the board: brows down, mouth
   // flat, sweat flying — whenever a ticket is dying or the board is full.
@@ -1519,6 +1585,14 @@ function drawChef(ctx, state) {
   // carries — the hands visibly hold it — or resting at his sides. The
   // old bare skin strokes vanished against the floor at judge size,
   // and a carried dish floated over the toque, held by nothing.
+  // A dish rides at tray height, hands under its rim; an ingredient
+  // has no plate under it, so it rides higher — at the old shared
+  // anchor an ingredient's lowest pieces lay inside the toque dome's
+  // span and read as worn on the hat (tomato slices as red discs,
+  // AUDIT-V18 W1) — and the arms and hands rise to meet the ride.
+  const carryDish = !!chef.carry && !!DISHES[chef.carry];
+  const armY = carryDish ? -44 : -60;
+  const handY = carryDish ? -46 : -62;
   ctx.lineCap = 'round';
   for (const side of [-1, 1]) {
     ctx.strokeStyle = '#2c4a7c';
@@ -1526,7 +1600,7 @@ function drawChef(ctx, state) {
     ctx.beginPath();
     if (chef.carry) {
       ctx.moveTo(x + side * 20, y + 8);
-      ctx.lineTo(x + side * 11, y - 44);
+      ctx.lineTo(x + side * 11, y + armY);
     } else {
       ctx.moveTo(x + side * 23, y + 2);
       ctx.lineTo(x + side * 27, y + 15);
@@ -1534,7 +1608,7 @@ function drawChef(ctx, state) {
     ctx.stroke();
     ctx.fillStyle = '#f0bd8f';
     ctx.beginPath();
-    ctx.arc(x + side * (chef.carry ? 11 : 27), y + (chef.carry ? -46 : 17), 3.7, 0, Math.PI * 2);
+    ctx.arc(x + side * (chef.carry ? 11 : 27), y + (chef.carry ? handY : 17), 3.7, 0, Math.PI * 2);
     ctx.fill();
   }
   // Apron body — harbour indigo, a cream apron front with a pocket.
@@ -1679,11 +1753,13 @@ function drawChef(ctx, state) {
   ctx.fillStyle = COLORS.redDark;
   ctx.beginPath(); ctx.arc(x + chef.face * 11, y - 3.3, 2.3, 0, Math.PI * 2); ctx.fill();
   // Whatever the chef carries rides overhead, both hands up — carried food
-  // casts no contact shadow; it is in the air, over his toque.
+  // casts no contact shadow; it is in the air, over his toque. A dish
+  // rides at −62 as a tray; an ingredient rides at −74, clear of the
+  // dome (W1) — the hands above already rose to meet it.
   if (chef.carry) {
     const dish = DISHES[chef.carry];
     if (dish) drawDish(ctx, chef.carry, x, y - 62, 66, false);
-    else drawItem(ctx, chef.carry, x, y - 60, 46, false);
+    else drawItem(ctx, chef.carry, x, y - 74, 46, false);
   }
   ctx.restore();
 }
@@ -1708,6 +1784,14 @@ function drawBoard(ctx, state) {
     rr(ctx, x + 3, y + 4, cardW, h, 7); ctx.fill();
     ctx.fillStyle = COLORS.paper;
     rr(ctx, x, y, cardW, h, 7); ctx.fill();
+    // The pin that holds the ticket: one brass dot through the paper's
+    // top edge — the shadows made the cards pinned paper; this is what
+    // pins them (AUDIT-V18 B3). It sits clear of the icon (x + 10..62)
+    // and the title (from x + 70) alike.
+    ctx.fillStyle = '#c99635';
+    ctx.beginPath(); ctx.arc(x + cardW / 2, y + 6, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8a6a24';
+    ctx.beginPath(); ctx.arc(x + cardW / 2, y + 6, 1.1, 0, Math.PI * 2); ctx.fill();
     if (frac < 0.25) {
       // The red zone, drawn to shout in a still frame: a soft alarm halo
       // outside the card and a hard red border on it.
@@ -1856,9 +1940,15 @@ function drawOverlays(ctx, state) {
     // ≈ 175–179, a tomato's underside reaching ≈ 196): the red tomato
     // showed through "one harbour kitchen". So the block now sits on a
     // flat deep-teal band of its own — one calm field behind both
-    // lines, the room still visible above and below it.
+    // lines, the room still visible above and below it. The band's
+    // own hard full-width edges cut seams across the room, though,
+    // so it hangs as a sign now: inset, rounded, brass-bordered —
+    // furniture, not a seam (AUDIT-V18 W2).
     ctx.fillStyle = 'rgba(20,34,40,0.45)';
-    ctx.fillRect(0, 96, VIEW.width, 112);
+    rr(ctx, 140, 96, 1000, 112, 10); ctx.fill();
+    ctx.strokeStyle = 'rgba(201,150,53,0.8)';
+    ctx.lineWidth = 2;
+    rr(ctx, 140, 96, 1000, 112, 10); ctx.stroke();
     text(ctx, 'THE DAILY CATCH', cx, 140, 70, '#ffd968');
     text(ctx, 'one cook, one harbour kitchen, the whole lunch rush', cx, 184, 20, COLORS.cream, 'center', false);
     // The menu board: every dish the kitchen serves, what goes into it and what
@@ -1946,9 +2036,13 @@ function drawOverlays(ctx, state) {
     text(ctx, `KITCHEN GRADE: ${letter} — ${title}`, cx, 532, 22, COLORS.mustard);
     text(ctx, 'PRESS R TO WORK ANOTHER SHIFT', cx, 578, 17, '#7dff9a');
     // The shift in work, counted at the stations as it happened — the frame's
-    // lower third tells the same story in labour instead of money.
+    // lower third tells the same story in labour instead of money. The
+    // strip takes the panel stack's own geometry (345, 590 wide): at
+    // 700 wide from x 290 it jutted past both panels above it, and the
+    // stack read as two-and-a-half (AUDIT-V18 W3). Its line keeps its
+    // full labels at 16 px — measured, it fits the narrower panel.
     const stats = state.stats || { chops: 0, grills: 0, fries: 0, burns: 0 };
-    chalkPanel(ctx, 290, 606, 700, 64);
+    chalkPanel(ctx, 345, 606, 590, 64);
     text(ctx, 'FROM THE PASS — THE SHIFT IN WORK', cx, 625, 11, '#9fb4ac');
     text(ctx, `CHOPS ${stats.chops}      GRILLS FIRED ${stats.grills}      FRYERS DROPPED ${stats.fries}      BURNT ${stats.burns}`, cx, 650, 16, COLORS.cream);
   }
