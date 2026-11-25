@@ -17,17 +17,40 @@ piece by piece and serve it before its ticket's timer dies.
   you needs: take, set down, chop, lift, plate, serve, bin
 - **Start:** ENTER · **Another shift:** R
 
-A shift is 150 seconds. Every ticket carries a timer and pays a tip that grows with
-the time left on its clock; a ticket that runs out walks, and costs you $4. As the
-shift deepens the board fills faster and the tickets grow — bigger plates, chips on
-the side — but the job never changes: route yourself well and nothing burns.
+## How a shift plays
+
+A shift is 150 seconds. Tickets land on the order board two at a time, then faster;
+each one names a dish, shows its price, and drains a timer bar as its patience runs
+out. Serve a ticket in time and you bank its price plus a tip that grows with the
+time left on its clock; let the bar empty and the guest walks, costing you $4.
+
+Every dish is a route. Raw pieces come from the six bins on the back counter;
+tomatoes, lettuce and potatoes go under the knife at the chopping boards; fillets
+and prawns go on the grill; cut potato goes in the fryer — and everything on heat
+burns if you leave it. Pieces are assembled on a plate at the plating counter, the
+resting island in the middle of the room holds work-in-progress while you fetch the
+next piece, and finished dishes leave through the serve window.
+
+The pressure is the clock, not new chores: as the shift deepens the board holds
+more tickets at once (up to five), the bigger plates unlock, combo tickets start
+asking for chips on the side, and tempers get a little shorter. When the 150
+seconds run out the shutters come down and the game tells the shift's story —
+what you took, what you served dish by dish, how much work the stations did, and
+a kitchen grade for the run.
 
 ## The menu
 
-Grilled Fillet · Garden Salad · Fish Butty · Harbour Plate · Prawn Greens — plus
-chips from the fryer, and combo tickets that want a plate and chips together. Every
-dish is assembled from raw pieces: fillets and prawns off the grill, tomatoes,
-lettuce and potatoes under the knife, rolls from the bin.
+| Dish | Price | Built from |
+| --- | ---: | --- |
+| Grilled Fillet | $9 | a fillet off the grill |
+| Garden Salad | $8 | cut lettuce + tomato slices |
+| Fish Butty | $12 | bread roll + grilled fillet + cut lettuce |
+| Harbour Plate | $13 | grilled fillet + cut lettuce + tomato slices |
+| Prawn Greens | $14 | grilled prawns + cut lettuce + tomato slices |
+| Chips | $6 | cut potato, straight from the fryer |
+
+Combo tickets pair one of the plates with chips on the same ticket — one route,
+two lines, a bigger tip.
 
 ## Running it
 

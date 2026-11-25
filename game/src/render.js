@@ -481,6 +481,54 @@ function drawMidChop(ctx, item, chops, x, y, s) {
   ctx.restore();
 }
 
+/**
+ * Cut potato in the fryer, still cooking: separated batons standing in hot
+ * oil, drawn as their own little scene instead of reusing the plain cut-potato
+ * item — four bare sticks in a row collapsed into a pale "W" at contact-sheet
+ * size. These are the finished chips' family (same stick drawing, same gold
+ * one step paler, no carton, no salt) with their feet in bubbling oil, so the
+ * fryer at work reads as frying, not as a letter.
+ */
+function drawFryerCooking(ctx, cx, cy) {
+  const oilY = cy + 13;
+  // The batons, back row first: varied heights and leans, hash-placed so the
+  // arrangement never moves between frames.
+  const baton = (ox, h, rot, face, shade, edge) => {
+    ctx.save();
+    ctx.translate(cx + ox, oilY + 2);
+    ctx.rotate(rot);
+    ctx.fillStyle = face;
+    rr(ctx, -3.4, -h, 6.8, h, 2); ctx.fill();
+    ctx.fillStyle = shade;
+    ctx.fillRect(1, -h + 2.5, 2, h - 5);
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 0.9;
+    rr(ctx, -3.4, -h, 6.8, h, 2); ctx.stroke();
+    ctx.restore();
+  };
+  const sticks = [[-40, 30, -0.16], [-27, 38, -0.06], [-13, 33, 0.08], [1, 41, -0.02], [15, 35, 0.12], [28, 39, 0.05], [41, 29, 0.17]];
+  for (const [ox, h, rot] of sticks) baton(ox, h, rot, '#f4dc96', '#e3c26e', '#bd9440');
+  // The oil itself, drawn over the batons' feet: a deep gold bath with a
+  // brighter, broken surface.
+  ctx.fillStyle = 'rgba(214,158,44,0.88)';
+  ctx.beginPath(); ctx.ellipse(cx, oilY, 55, 12.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(246,205,105,0.75)';
+  ctx.beginPath(); ctx.ellipse(cx, oilY - 2.5, 51, 8.5, 0, 0, Math.PI * 2); ctx.fill();
+  // Bubbles in the oil, clustered at the batons' feet — hash-placed, so a
+  // still frame holds them exactly where a moving one would.
+  ctx.fillStyle = 'rgba(255,248,220,0.85)';
+  for (let i = 0; i < 16; i++) {
+    const bx = cx + (hash2(i, 3) - 0.5) * 96;
+    const by = oilY - 3 + (hash2(i, 5) - 0.5) * 13;
+    ctx.beginPath(); ctx.arc(bx, by, 0.9 + hash2(i, 9) * 1.7, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255,248,220,0.6)';
+  for (let i = 0; i < 5; i++) {
+    const bx = cx + (hash2(i, 21) - 0.5) * 84;
+    ctx.beginPath(); ctx.arc(bx, oilY - 11 - hash2(i, 23) * 5, 1 + hash2(i, 27) * 1.1, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
 function drawMachine(ctx, state, station, machine) {
   const kind = station.kind;
   const cookAt = kind === 'grill' ? GRILL_COOK : FRYER_COOK;
@@ -494,7 +542,10 @@ function drawMachine(ctx, state, station, machine) {
   if (machine.item) {
     const cook = COOKED[machine.item];
     const shown = machine.t >= burnAt ? cook.burnt : machine.t >= cookAt ? cook.makes : machine.item;
-    drawItem(ctx, shown, cx, cy - 4, kind === 'grill' ? 54 : 52);
+    // In the fryer, raw cut potato gets its own cooking scene (batons in
+    // bubbling oil); everywhere else the item itself is the picture.
+    if (kind === 'fryer' && machine.t < cookAt) drawFryerCooking(ctx, cx, cy);
+    else drawItem(ctx, shown, cx, cy - 4, kind === 'grill' ? 54 : 52);
     const color = machine.t >= burnAt ? COLORS.red : machine.t >= cookAt ? COLORS.timerGood : COLORS.mustard;
     drawProgress(ctx, station.x + 16, station.y + station.h - 20, station.w - 32, machine.t / burnAt, color);
     // Steam wisps, swaying with the clock so the frame feels alive — three of
