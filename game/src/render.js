@@ -58,7 +58,7 @@ function text(ctx, str, x, y, size, color, align = 'center', bold = true) {
  * fat at the head, slimming ring by ring to a fanned tail — with an eye and feelers.
  * Centred on the origin, roughly 36 units wide before the caller's scale.
  */
-function drawPrawn(ctx, colors, rot) {
+function drawPrawn(ctx, colors, rot, sheen = true) {
   ctx.save();
   ctx.rotate(rot);
   const segs = [];
@@ -87,6 +87,14 @@ function drawPrawn(ctx, colors, rot) {
     ctx.lineWidth = 1.1;
     ctx.beginPath(); ctx.arc(s.x, s.y, s.r, -0.5, 2.1); ctx.stroke();
   }
+  if (sheen) {
+    // A wet sheen on the head and one mid segment — fresh or just grilled,
+    // the shell catches the light. Burnt prawns are matte and skip it.
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    for (const s of [segs[0], segs[2]]) {
+      ctx.beginPath(); ctx.arc(s.x - s.r * 0.3, s.y - s.r * 0.38, s.r * 0.3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
   // The head: one dark eye and two long feelers sweeping back.
   const head = segs[0];
   ctx.fillStyle = '#2b2320';
@@ -103,18 +111,38 @@ function drawPrawn(ctx, colors, rot) {
   ctx.restore();
 }
 
+/**
+ * The contact shadow every piece of food sits on: one flat ellipse of warm
+ * shade in the renderer's own language (no gradients anywhere in this file),
+ * drawn in the caller's local units just before the food itself, so a tomato
+ * on a board and a plate on the pass both rest on the surface under them
+ * instead of floating over it. One helper, one colour, everywhere.
+ */
+function foodShadow(ctx, rx, y) {
+  ctx.fillStyle = 'rgba(74,44,16,0.20)';
+  ctx.beginPath(); ctx.ellipse(0, y, rx, rx * 0.24, 0, 0, Math.PI * 2); ctx.fill();
+}
+
 /** One ingredient, centred on (x, y), roughly s px across. Used by bins, hands and boards. */
-export function drawItem(ctx, item, x, y, s) {
+export function drawItem(ctx, item, x, y, s, shadow = true) {
   const u = s / 40;
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(u, u);
+  if (shadow) foodShadow(ctx, item.startsWith('fillet') ? 17 : 15.5, 14.5);
   switch (item) {
     case 'bun':
       ctx.fillStyle = '#e8b06a';
       ctx.beginPath(); ctx.ellipse(0, 2, 17, 12, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#f2c078';
       ctx.beginPath(); ctx.ellipse(0, -2, 16, 11, 0, Math.PI, 0); ctx.fill();
+      // The baker's scoring: three shallow slashes opened across the dome.
+      ctx.strokeStyle = 'rgba(160,100,40,0.65)';
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = 'round';
+      for (const [sx, ex] of [[-10, -4], [-2, 4], [6, 11]]) {
+        ctx.beginPath(); ctx.moveTo(sx, -6.5); ctx.quadraticCurveTo((sx + ex) / 2, -10.5, ex, -6.5); ctx.stroke();
+      }
       ctx.fillStyle = '#fff3da';
       for (const [sx, sy] of [[-8, -6], [0, -9], [8, -6], [-4, -3], [5, -3]]) {
         ctx.beginPath(); ctx.ellipse(sx, sy, 2, 1.2, 0.4, 0, Math.PI * 2); ctx.fill();
@@ -133,6 +161,11 @@ export function drawItem(ctx, item, x, y, s) {
       ctx.beginPath(); ctx.ellipse(-4, -3, 8, 3.4, -0.3, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#2b2320';
       ctx.beginPath(); ctx.arc(-11, -1.5, 1.7, 0, Math.PI * 2); ctx.fill();
+      if (item === 'fillet_raw') {
+        // Fresh off the boat: a wet sheen band along the flank.
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath(); ctx.ellipse(-1, -3.4, 9, 2.7, -0.18, 0, Math.PI * 2); ctx.fill();
+      }
       if (item === 'fillet_grilled') {
         // Char marks from the grill bars, then a glisten of cooking oil on top.
         ctx.strokeStyle = '#7a451f'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
@@ -152,9 +185,10 @@ export function drawItem(ctx, item, x, y, s) {
       const colors = item === 'prawns_raw' ? { body: '#e8ab90', line: '#bd7f63' }
         : item === 'prawns_grilled' ? { body: '#f4834f', line: '#c25227' }
         : { body: '#503a2c', line: '#2e2019' };
-      drawPrawn(ctx, colors, 0.25);
-      ctx.save(); ctx.translate(9, 8); ctx.scale(0.82, 0.82); drawPrawn(ctx, colors, 2.5); ctx.restore();
-      ctx.save(); ctx.translate(-9, 9); ctx.scale(0.7, 0.7); drawPrawn(ctx, colors, -0.9); ctx.restore();
+      const sheen = item !== 'prawns_burnt';
+      drawPrawn(ctx, colors, 0.25, sheen);
+      ctx.save(); ctx.translate(9, 8); ctx.scale(0.82, 0.82); drawPrawn(ctx, colors, 2.5, sheen); ctx.restore();
+      ctx.save(); ctx.translate(-9, 9); ctx.scale(0.7, 0.7); drawPrawn(ctx, colors, -0.9, sheen); ctx.restore();
       break;
     }
     case 'tomato':
@@ -162,6 +196,11 @@ export function drawItem(ctx, item, x, y, s) {
       ctx.beginPath(); ctx.arc(0, 1, 15, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#ef6a4d';
       ctx.beginPath(); ctx.arc(-4, -3, 6, 0, Math.PI * 2); ctx.fill();
+      // A ripe gloss: one soft highlight and its pin-dot, upper left.
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath(); ctx.ellipse(-5.5, -5.5, 4.2, 2.6, -0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.beginPath(); ctx.arc(-2.2, -8.6, 1.4, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#4d8f3a';
       ctx.beginPath(); ctx.ellipse(0, -13, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
       break;
@@ -174,6 +213,9 @@ export function drawItem(ctx, item, x, y, s) {
       }
       break;
     case 'lettuce':
+      // A dark heart under the leaves, so the ruffles sit in their own shade.
+      ctx.fillStyle = '#4c8a3e';
+      ctx.beginPath(); ctx.ellipse(0, 8, 12, 4.5, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#579a44';
       for (const [ox, oy] of [[-9, 3], [9, 3], [0, -5]]) {
         ctx.beginPath(); ctx.arc(ox, oy + 1.5, 10.5, 0, Math.PI * 2); ctx.fill();
@@ -185,6 +227,13 @@ export function drawItem(ctx, item, x, y, s) {
       ctx.fillStyle = '#a5dd8f';
       ctx.beginPath(); ctx.arc(-5, -4, 6.5, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(6, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+      // Pale veins out from the heart of each leaf.
+      ctx.strokeStyle = 'rgba(220,245,205,0.8)';
+      ctx.lineWidth = 1.3;
+      ctx.lineCap = 'round';
+      for (const [x1, y1, x2, y2] of [[-9, 4, -13, -1], [9, 4, 13, -1], [0, -4, 0, -10]]) {
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      }
       break;
     case 'lettuce_cut': {
       // Shreds with real colour pop: a dark bed, bright bodies, pale tips.
@@ -205,6 +254,9 @@ export function drawItem(ctx, item, x, y, s) {
       ctx.beginPath(); ctx.ellipse(0, 0, 16, 11, 0.3, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#b8894a';
       for (const [px, py] of [[-7, -3], [4, 2], [9, -5], [-2, 6]]) { ctx.beginPath(); ctx.arc(px, py, 1.8, 0, Math.PI * 2); ctx.fill(); }
+      // A dull sheen on the skin, upper left.
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+      ctx.beginPath(); ctx.ellipse(-4, -4.5, 6, 3, 0.3, 0, Math.PI * 2); ctx.fill();
       break;
     case 'potato_cut':
       // Cut potato, one step deeper toward the chips' gold than it used to be —
@@ -263,15 +315,26 @@ export function drawItem(ctx, item, x, y, s) {
 const LAYER_ORDER = ['bun', 'lettuce_cut', 'tomato_cut', 'fillet_grilled', 'prawns_grilled'];
 
 /** A plated dish (or a plate mid-assembly) drawn as its stacked layers, plate included. */
-export function drawPlate(ctx, items, x, y, s) {
+export function drawPlate(ctx, items, x, y, s, shadow = true) {
   const u = s / 90;
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(u, u);
+  if (shadow) foodShadow(ctx, 44, 18);
+  // Crockery, not a disc: a grey outer edge under the white, a hairline
+  // around the rim, the well a touch deeper, and a sheen along the rim's
+  // left where the light catches it.
+  ctx.fillStyle = '#bfcbd0';
+  ctx.beginPath(); ctx.ellipse(0, 17.5, 43.5, 13.8, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#ffffff';
   ctx.beginPath(); ctx.ellipse(0, 16, 42, 13, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#aebfc5';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.ellipse(0, 16, 42, 13, 0, 0, Math.PI * 2); ctx.stroke();
   ctx.fillStyle = '#dfe5e8';
   ctx.beginPath(); ctx.ellipse(0, 15, 33, 9, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.beginPath(); ctx.ellipse(-15, 11.5, 12, 3, -0.15, 0, Math.PI * 2); ctx.fill();
   const layers = LAYER_ORDER.filter((item) => items.includes(item));
   let top = 12;
   for (const item of layers) {
@@ -300,13 +363,57 @@ export function drawPlate(ctx, items, x, y, s) {
     }
   }
   if (layers.length > 1 && items.includes('bun')) {
-    // The top bun crowns a finished butty.
+    // The top bun crowns a finished butty — scored like its bin self.
     ctx.fillStyle = '#f2c078';
     ctx.beginPath(); ctx.ellipse(0, top - 2, 29, 15, 0, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle = 'rgba(160,100,40,0.6)';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    for (const [sx, ex] of [[-16, -7], [-3, 6], [10, 18]]) {
+      ctx.beginPath(); ctx.moveTo(sx, top - 9); ctx.quadraticCurveTo((sx + ex) / 2, top - 13.5, ex, top - 9); ctx.stroke();
+    }
     ctx.fillStyle = '#fff3da';
     for (const [sx, sy] of [[-14, top - 10], [0, top - 14], [14, top - 10], [-6, top - 6], [8, top - 6]]) {
       ctx.beginPath(); ctx.ellipse(sx, sy, 2.6, 1.5, 0.4, 0, Math.PI * 2); ctx.fill();
     }
+  }
+  // The finish, the difference between food and a dish: a grilled plate gets
+  // a sauce drizzle across its top and a lemon wedge at its side; every
+  // plate gets a garnish sprig at its rim; a salad gets its dressing dots.
+  const grilled = items.includes('fillet_grilled') || items.includes('prawns_grilled');
+  if (grilled) {
+    ctx.strokeStyle = 'rgba(146,64,24,0.55)';
+    ctx.lineWidth = 2.1;
+    ctx.lineCap = 'round';
+    for (const dy of [-3.5, 0.5]) {
+      ctx.beginPath();
+      ctx.moveTo(-17, top + dy);
+      ctx.quadraticCurveTo(-6, top + dy - 3.4, 4, top + dy);
+      ctx.quadraticCurveTo(11, top + dy + 2.6, 17, top + dy - 0.6);
+      ctx.stroke();
+    }
+    // The lemon wedge: a yellow fan with a paler heart, at the plate's left.
+    ctx.fillStyle = '#f7c948';
+    ctx.beginPath(); ctx.moveTo(-33, 9); ctx.lineTo(-24, 1); ctx.lineTo(-23, 11); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fbe38a';
+    ctx.beginPath(); ctx.moveTo(-30.5, 8); ctx.lineTo(-25.5, 4); ctx.lineTo(-25, 9.5); ctx.closePath(); ctx.fill();
+  }
+  if (items.includes('lettuce_cut') && items.includes('tomato_cut') && !grilled && !items.includes('bun')) {
+    ctx.fillStyle = 'rgba(255,246,220,0.85)';
+    for (const [dx, dy] of [[-11, -2], [2, -5], [12, -1], [-3, 1.5]]) {
+      ctx.beginPath(); ctx.arc(dx, top + dy, 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (layers.length) {
+    // A garnish sprig at the rim: two small leaves and a stem, bright green.
+    ctx.strokeStyle = '#4c8a3e';
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(27, 10); ctx.quadraticCurveTo(30, 6, 33.5, 4.5); ctx.stroke();
+    ctx.fillStyle = '#579a44';
+    ctx.beginPath(); ctx.ellipse(31.5, 5.5, 3.6, 2, 0.7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#a5dd8f';
+    ctx.beginPath(); ctx.ellipse(34, 7.5, 2.8, 1.6, 0.9, 0, Math.PI * 2); ctx.fill();
   }
   if (items.includes('lettuce_cut') && items.includes('tomato_cut') && !items.includes('bun')
     && !items.includes('fillet_grilled') && !items.includes('prawns_grilled')) {
@@ -327,10 +434,19 @@ function drawPlateSpread(ctx, items, x, y, s) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(u, u);
+  foodShadow(ctx, 56, 12.5);
+  // The same crockery as a finished plate: grey edge, hairline, sheen.
+  ctx.fillStyle = '#bfcbd0';
+  ctx.beginPath(); ctx.ellipse(0, 11, 56.5, 18.8, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#ffffff';
   ctx.beginPath(); ctx.ellipse(0, 10, 55, 18, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#aebfc5';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.ellipse(0, 10, 55, 18, 0, 0, Math.PI * 2); ctx.stroke();
   ctx.fillStyle = '#dfe5e8';
   ctx.beginPath(); ctx.ellipse(0, 9, 45, 12.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.beginPath(); ctx.ellipse(-20, 5.5, 16, 4, -0.15, 0, Math.PI * 2); ctx.fill();
   const slots = items.length >= 3 ? [[-29, 1], [0, -6], [29, 1]]
     : items.length === 2 ? [[-28, 0], [28, 0]]
     : [[-16, 0]];
@@ -347,13 +463,13 @@ function drawPlateSpread(ctx, items, x, y, s) {
 }
 
 /** The icon for a whole dish: a plate stack for recipes, the carton for fries. */
-export function drawDish(ctx, dishId, x, y, s) {
+export function drawDish(ctx, dishId, x, y, s, shadow = true) {
   if (dishId === 'fries') {
-    drawItem(ctx, 'fries', x, y, s * 0.9);
+    drawItem(ctx, 'fries', x, y, s * 0.9, shadow);
     return;
   }
   const recipe = DISHES[dishId];
-  if (recipe) drawPlate(ctx, recipe.items, x, y, s);
+  if (recipe) drawPlate(ctx, recipe.items, x, y, s, shadow);
 }
 
 function drawStationBase(ctx, station, active, shaking) {
@@ -413,6 +529,7 @@ function drawMidChop(ctx, item, chops, x, y, s) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(u, u);
+  foodShadow(ctx, 17, 13);
   if (item === 'tomato') {
     // Slices already off, fanned to the left.
     for (let i = 0; i < chops; i++) {
@@ -434,6 +551,9 @@ function drawMidChop(ctx, item, chops, x, y, s) {
     for (const [sx, sy] of [[4, 4], [10, 5.4], [16, 4]]) {
       ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2); ctx.fill();
     }
+    // The dome's gloss, the same highlight the whole tomato wears.
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.ellipse(5.5, -2.5, 3.4, 1.9, -0.5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#4d8f3a';
     ctx.beginPath(); ctx.ellipse(10, -8.5, 5, 2.6, 0, 0, Math.PI * 2); ctx.fill();
   } else if (item === 'potato') {
@@ -499,6 +619,8 @@ function drawFryerCooking(ctx, cx, cy) {
     ctx.rotate(rot);
     ctx.fillStyle = face;
     rr(ctx, -3.4, -h, 6.8, h, 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,252,235,0.5)';
+    ctx.fillRect(-2.4, -h + 3, 1.5, h - 8);
     ctx.fillStyle = shade;
     ctx.fillRect(1, -h + 2.5, 2, h - 5);
     ctx.strokeStyle = edge;
@@ -762,6 +884,8 @@ function drawKitchen(ctx, state) {
   crate(1166, 552, 58, 42);
   ctx.fillStyle = '#d8402a';
   ctx.beginPath(); ctx.arc(1184, 550, 7.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.beginPath(); ctx.arc(1181.5, 547.5, 2.2, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#6db457';
   ctx.beginPath(); ctx.arc(1200, 548, 8.5, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#a5dd8f';
@@ -874,6 +998,10 @@ function drawKitchen(ctx, state) {
       // A dressed resting plate at the left end: greens, tomato, a lemon wedge.
       const rpX = station.x + 62;
       const rpY = station.y + 46;
+      ctx.fillStyle = 'rgba(74,44,16,0.18)';
+      ctx.beginPath(); ctx.ellipse(rpX, rpY + 3.5, 28, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#bfcbd0';
+      ctx.beginPath(); ctx.ellipse(rpX, rpY + 0.8, 27.8, 10, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.ellipse(rpX, rpY, 27, 9.5, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#dfe5e8';
@@ -891,8 +1019,15 @@ function drawKitchen(ctx, state) {
       }
       ctx.fillStyle = '#f7c948';
       ctx.beginPath(); ctx.moveTo(rpX + 15, rpY + 2); ctx.lineTo(rpX + 21, rpY - 3); ctx.lineTo(rpX + 21, rpY + 4); ctx.closePath(); ctx.fill();
+      // A garnish sprig on the resting plate too — the same finish as the pass.
+      ctx.fillStyle = '#579a44';
+      ctx.beginPath(); ctx.ellipse(rpX - 19, rpY - 5, 3.4, 1.9, 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#a5dd8f';
+      ctx.beginPath(); ctx.ellipse(rpX - 16.5, rpY - 2.8, 2.6, 1.5, 0.9, 0, Math.PI * 2); ctx.fill();
       // Two garnish bowls at the right end: chopped greens, diced tomato.
       const bowl = (bx, mound, fleck) => {
+        ctx.fillStyle = 'rgba(74,44,16,0.15)';
+        ctx.beginPath(); ctx.ellipse(bx, station.y + 50, 15, 4, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = COLORS.tealDark;
         ctx.beginPath(); ctx.ellipse(bx, station.y + 46, 14.5, 8.5, 0, 0, Math.PI); ctx.fill();
         ctx.fillStyle = mound;
@@ -993,8 +1128,15 @@ function drawKitchen(ctx, state) {
         if (recipeForStack(state.plate)) drawPlate(ctx, state.plate, cx, station.y + 42, 104);
         else drawPlateSpread(ctx, state.plate, cx, station.y + 44, 150);
       } else {
+        // The empty plate waiting on the pass wears the same crockery as a
+        // full one: grey edge, hairline, sheen.
+        ctx.fillStyle = '#bfcbd0';
+        ctx.beginPath(); ctx.ellipse(cx, station.y + 53.5, 43.5, 13.8, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#ffffff';
         ctx.beginPath(); ctx.ellipse(cx, station.y + 52, 42, 13, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#aebfc5';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.ellipse(cx, station.y + 52, 42, 13, 0, 0, Math.PI * 2); ctx.stroke();
         ctx.fillStyle = '#dfe5e8';
         ctx.beginPath(); ctx.ellipse(cx, station.y + 51, 33, 9, 0, 0, Math.PI * 2); ctx.fill();
       }
@@ -1154,11 +1296,12 @@ function drawChef(ctx, state) {
   ctx.lineTo(x + chef.face * 13, y - 4);
   ctx.lineTo(x - 2, y + 1);
   ctx.closePath(); ctx.fill();
-  // Whatever the chef carries rides overhead, both hands up.
+  // Whatever the chef carries rides overhead, both hands up — carried food
+  // casts no contact shadow; it is in the air, over his toque.
   if (chef.carry) {
     const dish = DISHES[chef.carry];
-    if (dish) drawDish(ctx, chef.carry, x, y - 62, 66);
-    else drawItem(ctx, chef.carry, x, y - 60, 46);
+    if (dish) drawDish(ctx, chef.carry, x, y - 62, 66, false);
+    else drawItem(ctx, chef.carry, x, y - 60, 46, false);
   }
 }
 
