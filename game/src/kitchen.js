@@ -1,0 +1,46 @@
+// The kitchen itself: one fresh state for a shift, the chef, the machines and the plate.
+// No rules live here — this module only holds what the world currently looks like.
+
+import { CHEF, SHIFT_SECONDS, stationById } from './config.js';
+import { makeRng } from './random.js';
+
+export function createGame(seed) {
+  return {
+    rng: makeRng(seed),
+    phase: 'title', // title -> play -> over
+    time: 0,
+    shiftLeft: SHIFT_SECONDS,
+    score: 0,
+    served: 0,
+    walkouts: 0,
+    bestTip: 0,
+    chef: { x: 640, y: 470, face: 1, carry: null, walk: 0 },
+    grill: { item: null, t: 0 },
+    fryer: { item: null, t: 0 },
+    boards: [
+      { station: stationById('board-1'), item: null, chops: 0 },
+      { station: stationById('board-2'), item: null, chops: 0 },
+    ],
+    plate: [], // ingredient ids stacked on the plating counter's plate
+    passDish: null, // a served dish resting on the pass, briefly
+    passT: 0,
+    tickets: [],
+    nextTicketId: 1,
+    spawnT: 0,
+    popups: [], // {x, y, text, color, t, life}
+    shake: null, // station id that just refused an action
+    shakeT: 0,
+    hint: '',
+    hintT: 0, // how long the hint line stays up after the prompt
+  };
+}
+
+/** Add a floating score note that drifts up and fades. */
+export function addPopup(state, x, y, text, color) {
+  state.popups.push({ x, y, text, color, t: 0, life: 1.4 });
+}
+
+/** How far through the shift we are, 0 at the doors opening and 1 at last orders. */
+export function heat(state) {
+  return Math.min(1, Math.max(0, 1 - state.shiftLeft / SHIFT_SECONDS));
+}
