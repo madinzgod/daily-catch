@@ -49,8 +49,9 @@ export function draw(ctx, state) {
 // The game's voice: Fredoka, a rounded display face embedded in game/fonts/
 // (subsetted woff2, declared in index.html), with the old system stack
 // behind it — if the face fails to load, the game speaks exactly as it did
-// before it had one. Fredoka carries no → or ✓ glyph; those two fall back
-// per-glyph to the stack behind it, as they always did to the system.
+// before it had one. Fredoka carries no → or ✓ glyph; those two are never
+// set as text at all — both are drawn as vector strokes (drawCheck,
+// drawArrow), so no glyph falls back per-glyph to the stack behind it.
 const FONT = "'Fredoka', 'Trebuchet MS', 'Segoe UI', Verdana, sans-serif";
 
 function rr(ctx, x, y, w, h, r) {
@@ -64,6 +65,38 @@ function text(ctx, str, x, y, size, color, align = 'center', bold = true) {
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
   ctx.fillText(str, x, y);
+}
+
+/**
+ * A check mark as two strokes, s = half-width. Fredoka has no ✓ glyph, so
+ * the game's most affirmative mark is drawn, never set as text — it wears
+ * the same rounded hand as everything else instead of a fallback face's.
+ */
+function drawCheck(ctx, cx, cy, s, color, lw) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - s, cy + s * 0.05);
+  ctx.lineTo(cx - s * 0.35, cy + s * 0.72);
+  ctx.lineTo(cx + s, cy - s * 0.68);
+  ctx.stroke();
+}
+
+/** A right arrow as strokes — Fredoka has no → glyph either. */
+function drawArrow(ctx, cx, cy, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - 6, cy);
+  ctx.lineTo(cx + 5, cy);
+  ctx.moveTo(cx + 1, cy - 4);
+  ctx.lineTo(cx + 5, cy);
+  ctx.lineTo(cx + 1, cy + 4);
+  ctx.stroke();
 }
 
 /**
@@ -202,8 +235,8 @@ export function drawItem(ctx, item, x, y, s, shadow = true) {
         : { body: '#503a2c', line: '#2e2019' };
       const sheen = item !== 'prawns_burnt';
       drawPrawn(ctx, colors, 0.25, sheen);
-      ctx.save(); ctx.translate(9, 8); ctx.scale(0.82, 0.82); drawPrawn(ctx, colors, 2.5, sheen); ctx.restore();
-      ctx.save(); ctx.translate(-9, 9); ctx.scale(0.7, 0.7); drawPrawn(ctx, colors, -0.9, sheen); ctx.restore();
+      ctx.save(); ctx.translate(12, 9); ctx.scale(0.8, 0.8); drawPrawn(ctx, colors, 2.6, sheen); ctx.restore();
+      ctx.save(); ctx.translate(-12, 10); ctx.scale(0.66, 0.66); drawPrawn(ctx, colors, -1.05, sheen); ctx.restore();
       break;
     }
     case 'tomato':
@@ -806,11 +839,16 @@ function drawKitchen(ctx, state) {
   // own stripe — a mat's border, not a target.
   ctx.fillStyle = COLORS.rug;
   ctx.beginPath(); ctx.ellipse(640, 460, 268, 96, 0, 0, Math.PI * 2); ctx.fill();
-  for (const [rx, ry, col, wdt] of [[244, 84, COLORS.rugStripe, 5], [214, 72, COLORS.rugStripe, 4]]) {
+  // The rings wear at half strength: at full strength the pale stripe was
+  // the loudest graphic in the middle band — two hard outlines around a
+  // plain middle, reading as a target the V13 fix meant to take away.
+  ctx.globalAlpha = 0.5;
+  for (const [rx, ry, col, wdt] of [[244, 84, COLORS.rugStripe, 4], [214, 72, COLORS.rugStripe, 3]]) {
     ctx.strokeStyle = col;
     ctx.lineWidth = wdt;
     ctx.beginPath(); ctx.ellipse(640, 462, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
   }
+  ctx.globalAlpha = 1;
   // The rug's weave: short dashes in two quiet tones, hash-placed so they
   // never move, clipped to the rug's own ellipse — a woven mat on the middle
   // band's ground instead of one flat sticker of colour. It carries no
@@ -819,11 +857,11 @@ function drawKitchen(ctx, state) {
   ctx.beginPath(); ctx.ellipse(640, 460, 268, 96, 0, 0, Math.PI * 2); ctx.clip();
   ctx.lineCap = 'round';
   ctx.lineWidth = 2;
-  for (let i = 0; i < 210; i++) {
+  for (let i = 0; i < 280; i++) {
     const wx = 640 + (hash2(i, 31) - 0.5) * 520;
     const wy = 460 + (hash2(i, 37) - 0.5) * 176;
-    ctx.strokeStyle = i % 3 === 0 ? 'rgba(245,190,120,0.16)' : 'rgba(122,52,28,0.15)';
-    ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + 9 + hash2(i, 41) * 8, wy); ctx.stroke();
+    ctx.strokeStyle = i % 3 === 0 ? 'rgba(245,190,120,0.21)' : 'rgba(122,52,28,0.20)';
+    ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + 11 + hash2(i, 41) * 10, wy); ctx.stroke();
   }
   ctx.restore();
   // Counters.
@@ -1326,8 +1364,13 @@ function drawKitchen(ctx, state) {
         // call on a pill beside it. A plate ready to serve is one of the six
         // things the cover must show; at 74 units with a 10 px caption it
         // read as a smudge at the frame's edge, so now it gets the same
-        // badge language as READY! / BURNT! / CUT!.
-        drawDish(ctx, state.passDish, station.x + 74, station.y + 46, 104);
+        // badge language as READY! / BURNT! / CUT!. A plate lies flat at
+        // that scale; a chips carton stands ~52 units tall before scale —
+        // at 104 it towered ~122 px over the window, across its awning and
+        // into its label's first letter. Fries therefore sit smaller, on
+        // the counter, clear of the label — the badge carries the call.
+        const friesPass = state.passDish === 'fries';
+        drawDish(ctx, state.passDish, station.x + (friesPass ? 58 : 74), station.y + (friesPass ? 57 : 46), friesPass ? 60 : 104);
         drawBadge(ctx, station.x + 208, station.y + 50, 'READY TO SERVE!', '#1e7d46');
       }
       // The service bell.
@@ -1537,7 +1580,16 @@ function drawBoard(ctx, state) {
     }
     const main = ticket.items[0];
     drawDish(ctx, main.dish, x + 36, y + 33, 54);
-    if (main.done) text(ctx, '✓', x + 36, y + 33, 26, COLORS.teal);
+    if (main.done) {
+      // A served main wears a paper disc with a drawn check on it — the
+      // face has no ✓ glyph, and a fallback tick over the food was the
+      // board's one mark not drawn in the game's own hand.
+      ctx.fillStyle = COLORS.paper;
+      ctx.globalAlpha = 0.88;
+      ctx.beginPath(); ctx.arc(x + 36, y + 33, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      drawCheck(ctx, x + 36, y + 33, 10, COLORS.teal, 4.4);
+    }
     // The dish name owns the top row and shrinks to fit it; the price no longer
     // shares that row — it sits on the bottom row, so the two can never collide.
     let titleSize = 14.5;
@@ -1548,24 +1600,39 @@ function drawBoard(ctx, state) {
     }
     text(ctx, DISHES[main.dish].name, x + 70, y + 19, titleSize, COLORS.ink, 'left');
     let lineY = y + 36;
-    for (const line of ticket.items) {
-      text(ctx, `${line.done ? '✓' : '•'} ${DISHES[line.dish].name} $${DISHES[line.dish].price}`, x + 70, lineY, 12, line.done ? COLORS.teal : '#6b5a44', 'left', false);
-      lineY += 14.5;
+    // A one-dish ticket's only line repeats its own header — the name is the
+    // card's title and the price is in the bottom row — so it is not drawn:
+    // the make-up line below takes the first line's slot instead of sitting
+    // one row lower under an echo. A single's line can never be the ticked
+    // one (serving its only dish removes the ticket), so nothing the tick
+    // evidences is lost. Combo cards keep both lines — their per-dish
+    // prices are real information — and a ticked line wears a drawn check,
+    // not a glyph the face doesn't carry.
+    if (ticket.items.length > 1) {
+      for (const line of ticket.items) {
+        if (line.done) {
+          drawCheck(ctx, x + 76, lineY, 4.6, COLORS.teal, 2.1);
+          text(ctx, `${DISHES[line.dish].name} $${DISHES[line.dish].price}`, x + 86, lineY, 12, COLORS.teal, 'left', false);
+        } else {
+          text(ctx, `• ${DISHES[line.dish].name} $${DISHES[line.dish].price}`, x + 70, lineY, 12, '#6b5a44', 'left', false);
+        }
+        lineY += 14.5;
+      }
     }
     if (ticket.items.length === 1 && DISHES[main.dish].items) {
-      // A one-dish card has a dead band under its single line, and the line
-      // itself only repeats the title. Fill the band with what the dish is
-      // made of — the fetching route the game is about, in short piece
-      // names — so the board carries the depth, not an echo. Combo cards
-      // already fill both of their lines and keep them.
+      // What the dish is made of — the fetching route the game is about, in
+      // short piece names — so the board carries the depth, not an echo.
+      // Combo cards already fill both of their lines and keep them.
       const shortPiece = (item) => (item === 'bun' ? 'roll' : item.replace('_grilled', '').replace('_cut', ''));
       const parts = DISHES[main.dish].items.map(shortPiece).join(' · ');
       // A one-piece dish has no route to list: its only "make-up" would echo
       // its piece ("fillet" under Grilled Fillet — the board's barest line).
       // It prints its process instead, in the same muted voice — the note
-      // its own menu line already uses.
+      // its own menu line already uses. The voice is deepened a step this
+      // round: at #8a755a it was ~4.0:1 on the card's paper, the faintest
+      // text the board carries; #755c39 is ~5.3:1, the dish lines' family.
       const solo = { fillet: 'straight off the grill' }[main.dish];
-      text(ctx, DISHES[main.dish].items.length === 1 && solo ? solo : parts, x + 70, lineY, 11, '#8a755a', 'left', false);
+      text(ctx, DISHES[main.dish].items.length === 1 && solo ? solo : parts, x + 70, lineY, 11, '#755c39', 'left', false);
     }
     // The bottom row: what the ticket pays on the left, the seconds left on the right.
     text(ctx, `$${ticket.price} + tip`, x + 10, y + h - 21, 12.5, COLORS.tealDark, 'left');
@@ -1633,8 +1700,11 @@ function drawOverlays(ctx, state) {
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
   const cx = VIEW.width / 2;
   if (state.phase === 'title') {
-    text(ctx, 'THE DAILY CATCH', cx, 152, 70, '#ffd968');
-    text(ctx, 'one cook, one harbour kitchen, the whole lunch rush', cx, 196, 20, COLORS.cream, 'center', false);
+    // The block sits 12–14 px higher than it grew: the tagline's old row
+    // (glyph box ~186–206) was the bins' label row (y 200–212), and TOMATO /
+    // LETTUCE / PRAWNS showed dimmed through its letters.
+    text(ctx, 'THE DAILY CATCH', cx, 140, 70, '#ffd968');
+    text(ctx, 'one cook, one harbour kitchen, the whole lunch rush', cx, 184, 20, COLORS.cream, 'center', false);
     // The menu board: every dish the kitchen serves, what goes into it and what
     // it pays — the game's depth, chalked up where a judge can read it.
     chalkPanel(ctx, 235, 222, 810, 322);
@@ -1645,7 +1715,7 @@ function drawOverlays(ctx, state) {
     };
     [...RECIPES, FRIES].forEach((dish, i) => {
       const y = 288 + i * 40;
-      drawDish(ctx, dish.id, 302, y, 40);
+      drawDish(ctx, dish.id, 302, y, dish.id === 'fries' ? 30 : 40);
       text(ctx, dish.name, 334, y - 8, 15.5, COLORS.cream, 'left');
       const parts = menuNotes[dish.id]
         || dish.items.map((item) => INGREDIENTS[item].name.toLowerCase()).join(' + ');
@@ -1653,7 +1723,23 @@ function drawOverlays(ctx, state) {
       text(ctx, `$${dish.price}`, 1013, y - 2, 16.5, '#ffd968', 'right');
     });
     text(ctx, 'Combo tickets pair a plate with chips — one route, two lines, a bigger tip.', cx, 526, 13, '#9fb4ac', 'center', false);
-    text(ctx, 'HOW TO PLAY — FETCH from the bins → CHOP at the boards → GRILL / FRY → PLATE → SERVE', cx, 574, 16.5, COLORS.mustard);
+    // The route line is composed from its five stages with drawn arrows in
+    // the slots between them — the face carries no → glyph, so no arrow is
+    // set as text and nothing falls back to a thinner hand mid-sentence.
+    const routeStages = ['HOW TO PLAY — FETCH from the bins', 'CHOP at the boards', 'GRILL / FRY', 'PLATE', 'SERVE'];
+    ctx.font = `700 16.5px ${FONT}`;
+    const stageW = routeStages.map((s) => ctx.measureText(s).width);
+    const arrowSlot = 26;
+    const routeTotal = stageW.reduce((a, b) => a + b, 0) + arrowSlot * (routeStages.length - 1);
+    let routeX = cx - routeTotal / 2;
+    routeStages.forEach((stage, i) => {
+      text(ctx, stage, routeX, 574, 16.5, COLORS.mustard, 'left');
+      routeX += stageW[i];
+      if (i < routeStages.length - 1) {
+        drawArrow(ctx, routeX + arrowSlot / 2, 574, COLORS.mustard);
+        routeX += arrowSlot;
+      }
+    });
     text(ctx, 'Serve every ticket before its timer dies — tips grow with time to spare, a walkout costs $4.', cx, 600, 14, '#cfe0d8', 'center', false);
     text(ctx, 'MOVE  WASD / arrows (or click)      WORK  SPACE', cx, 628, 15, COLORS.mustard);
     text(ctx, 'PRESS ENTER — FIRST SHIFT', cx, 660, 20, '#7dff9a');
@@ -1682,13 +1768,16 @@ function drawOverlays(ctx, state) {
       // name: colour itself carries the demotion, so the panel cannot read
       // as six dishes in full colour over a shift that served four kinds.
       if (n === 0) { ctx.save(); ctx.globalAlpha = 0.45; }
-      drawDish(ctx, dish.id, colX - 82, y, 40);
+      drawDish(ctx, dish.id, colX - 82, y, dish.id === 'fries' ? 30 : 40);
       if (n === 0) ctx.restore();
       text(ctx, `${dish.name} ×${n}`, colX - 56, y, 15.5, n > 0 ? COLORS.cream : '#71827a', 'left', false);
     });
     // The number counts completed tickets, not lines — the panel above it
     // sums to one more (the combo's chips are a line of their own), and the
-    // label says which of the two it means.
+    // label says which of the two it means. The line wears a panel of its
+    // own: bare, it sat at y 490 straight across the island's brass name
+    // plate (y 487–500), and the plate's letters showed through the words.
+    chalkPanel(ctx, cx - 330, 470, 660, 42);
     text(ctx, `Tickets served ${state.served}      Walkouts ${state.walkouts}      Best tip $${state.bestTip}`, cx, 490, 17.5, '#cfe0d8', 'center', false);
     const [letter, title] = gradeFor(state.score);
     text(ctx, `KITCHEN GRADE: ${letter} — ${title}`, cx, 532, 22, COLORS.mustard);
