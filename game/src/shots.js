@@ -22,20 +22,33 @@ function ticket(id, lines, price, timeLeft, timeTotal) {
 function cover() {
   const s = createGame(7);
   s.phase = 'play';
-  s.time = 62;
-  s.shiftLeft = 88;
-  s.score = 86;
+  // The moment sits a breath later than it used to (1:12 left, not 1:28):
+  // the game's own ticket cap at 88 s left is 3, and the board below deals
+  // four — at 72 s left the cap is honestly 4, so the staged board obeys
+  // the same rule a live one would (the battery holds this).
+  s.time = 78;
+  s.shiftLeft = 72;
+  // The scoreboard is a coherent mid-shift figure: five servings at an
+  // ordinary strong average. (It stood at $86, which five servings can
+  // only reach at near-cap tips on every ticket — and which made the
+  // rush frame's 7-served $86 read as two servings for $0.)
+  s.score = 58;
   s.served = 5;
   s.tickets = [
     // The Harbour Plate is dying — 12 s left of 60 — so the cover carries
     // the game's own pressure language at the size the judge looks at: the
     // red zone (halo, hard border, alarm disc, red seconds) and, through
-    // the strain rule, the cook's face. The other two tickets stay calm,
-    // and the score, the served count and everything staged stay exactly
+    // the strain rule, the cook's face. The other tickets stay calm, and
+    // the score, the served count and everything staged stay exactly
     // as they were: a good kitchen under pressure, not a failing one.
     ticket(1, [['harbour', false]], 13, 12, 60),
     ticket(2, [['butty', false], ['fries', false]], 18, 52, 71),
     ticket(3, [['salad', false]], 8, 41, 71),
+    // A fourth dish on the board — Prawn Greens, calm at 58 of 71 — so the
+    // cover's board carries its depth across the band instead of ending
+    // at three cards and a long empty run of dark board. It is also the
+    // ticket the island's resting prawns were always travelling toward.
+    ticket(4, [['prawns', false]], 14, 58, 71),
   ];
   s.grill = { item: 'fillet_raw', t: 4.9 }; // grilled and READY
   s.fryer = { item: 'potato_cut', t: 3.8 }; // chips ready to lift
@@ -87,7 +100,10 @@ function rush() {
   s.bestTip = 6;
   s.tickets = [
     ticket(9, [['prawns', false]], 14, 12, 57),
-    ticket(10, [['butty', false], ['fries', false]], 18, 26, 64),
+    // The combo's chips line is already ticked: its chips are the dish
+    // resting on the pass below — a state the serve rule produces exactly
+    // (one line handed over, the ticket still waiting for its plate).
+    ticket(10, [['butty', false], ['fries', true]], 18, 26, 64),
     ticket(11, [['harbour', false]], 13, 31, 71),
     ticket(12, [['fillet', false]], 9, 44, 64),
     ticket(13, [['salad', false]], 8, 9, 71),
@@ -100,14 +116,21 @@ function rush() {
   s.boards[1].chops = 1; // a second dish in flight, mid-chop on the far board
   s.plate = ['bun'];
   s.island.item = 'fillet_grilled'; // a fillet resting on the island, waiting its plate
-  s.passDish = 'salad';
+  // The pass holds the combo's chips, served a moment ago (ticket #10's
+  // chips line above is ticked). It used to hold a Garden Salad while the
+  // board's salad ticket still waited unticked — a serve the game's own
+  // rule cannot have happened, since serving that salad ticks its ticket.
+  s.passDish = 'fries';
   s.passT = 1.2;
   s.chef.x = 1006;
   s.chef.y = 636;
   s.chef.carry = 'prawns'; // carrying the answer to ticket #9
   s.popups = [
     { x: 1100, y: 592, text: '+$20 TOP TIP!', color: '#1f7a6d', t: 0.25, life: 1.4 },
-    { x: 700, y: 300, text: 'HURRY!', color: '#d84a2f', t: 0.7, life: 1.4 },
+    // Centred between the two pendants, below their shades: at its old
+    // spot (700, 300) the pill sat on the right lamp's head and glow, and
+    // the room's lighting and the frame's urgency cheapened each other.
+    { x: 640, y: 372, text: 'HURRY!', color: '#d84a2f', t: 0.7, life: 1.4 },
   ];
   return s;
 }

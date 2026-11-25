@@ -45,10 +45,20 @@ if (shotName) {
   window.__game = state; // read by the screenshot/playtest tooling
   state.promptText = promptFor(state);
   draw(ctx, state);
-  requestAnimationFrame(() => {
+  // The frame is final only once the embedded face has settled: a
+  // screenshot must show the lettering the game actually wears, not
+  // whichever system font was warm. fonts.ready resolves even if a face
+  // fails to load, so a bad font can never hang the shot — the frame
+  // just falls back down the stack, as it is designed to.
+  const finish = () => {
     draw(ctx, state);
     window.__shotReady = true;
-  });
+  };
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => requestAnimationFrame(finish));
+  } else {
+    requestAnimationFrame(finish);
+  }
 } else {
   let state = createGame(Number.isFinite(seedParam) && seedParam > 0 ? seedParam : (Date.now() % 2147483647) + 1);
   Object.defineProperty(window, '__game', { get: () => state }); // read by the playtest tooling

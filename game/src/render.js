@@ -1,4 +1,4 @@
-// Every pixel of Last Ticket: the board of tickets across the top, the kitchen below it,
+// Every pixel of The Daily Catch: the board of tickets across the top, the kitchen below it,
 // the food drawn piece by piece, the chef, and the title and last-orders screens.
 // Nothing here changes the game — it only reads the state and draws it.
 
@@ -46,7 +46,12 @@ export function draw(ctx, state) {
   }
 }
 
-const FONT = "'Trebuchet MS', 'Segoe UI', Verdana, sans-serif";
+// The game's voice: Fredoka, a rounded display face embedded in game/fonts/
+// (subsetted woff2, declared in index.html), with the old system stack
+// behind it — if the face fails to load, the game speaks exactly as it did
+// before it had one. Fredoka carries no → or ✓ glyph; those two fall back
+// per-glyph to the stack behind it, as they always did to the system.
+const FONT = "'Fredoka', 'Trebuchet MS', 'Segoe UI', Verdana, sans-serif";
 
 function rr(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -159,13 +164,15 @@ export function drawItem(ctx, item, x, y, s, shadow = true) {
     case 'fillet_raw':
     case 'fillet_grilled':
     case 'fillet_burnt': {
-      // A whole fish, head left, tail right.
-      const body = item === 'fillet_raw' ? '#e8c8bd' : item === 'fillet_grilled' ? '#c98d4b' : '#33261e';
+      // A whole fish, head left, tail right. The raw body is a true salmon —
+      // a step deeper than it was, when its pallor washed out against the
+      // sea-glass counter and the game's hero ingredient lost its edge.
+      const body = item === 'fillet_raw' ? '#dfa894' : item === 'fillet_grilled' ? '#c98d4b' : '#33261e';
       ctx.fillStyle = body;
       ctx.beginPath(); ctx.ellipse(-2, 0, 15, 8.5, 0, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath();
       ctx.moveTo(11, 0); ctx.lineTo(19, -7); ctx.lineTo(19, 7); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = item === 'fillet_raw' ? '#b98d7d' : item === 'fillet_grilled' ? '#a06a30' : '#241a14';
+      ctx.fillStyle = item === 'fillet_raw' ? '#a97863' : item === 'fillet_grilled' ? '#a06a30' : '#241a14';
       ctx.beginPath(); ctx.ellipse(-4, -3, 8, 3.4, -0.3, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#2b2320';
       ctx.beginPath(); ctx.arc(-11, -1.5, 1.7, 0, Math.PI * 2); ctx.fill();
@@ -258,7 +265,9 @@ export function drawItem(ctx, item, x, y, s, shadow = true) {
       break;
     }
     case 'potato':
-      ctx.fillStyle = '#cfa15f';
+      // A richer skin than it wore — at its old pallor the speckles read as
+      // an egg's, not a potato's.
+      ctx.fillStyle = '#c69548';
       ctx.beginPath(); ctx.ellipse(0, 0, 16, 11, 0.3, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#b8894a';
       for (const [px, py] of [[-7, -3], [4, 2], [9, -5], [-2, 6]]) { ctx.beginPath(); ctx.arc(px, py, 1.8, 0, Math.PI * 2); ctx.fill(); }
@@ -574,7 +583,7 @@ function drawMidChop(ctx, item, chops, x, y, s) {
       rr(ctx, -2.6, -12, 5.2, 24, 2); ctx.fill();
       ctx.restore();
     }
-    ctx.fillStyle = '#cfa15f';
+    ctx.fillStyle = '#c69548';
     ctx.beginPath(); ctx.ellipse(10, 1, 15 - chops * 2.4, 10.5, 0.25, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#eabd60';
     ctx.beginPath(); ctx.ellipse(1.5, 0, 3, 8.4, 0.25, 0, Math.PI * 2); ctx.fill();
@@ -613,9 +622,10 @@ function drawMidChop(ctx, item, chops, x, y, s) {
  * Cut potato in the fryer, still cooking: separated batons standing in hot
  * oil, drawn as their own little scene instead of reusing the plain cut-potato
  * item — four bare sticks in a row collapsed into a pale "W" at contact-sheet
- * size. These are the finished chips' family (same stick drawing, same gold
- * one step paler, no carton, no salt) with their feet in bubbling oil, so the
- * fryer at work reads as frying, not as a letter.
+ * size. These are the finished chips' family (same stick drawing, gold warmed
+ * one step toward the finished chips', no carton, no salt) with their feet in
+ * a deep, saturated oil bath, so the fryer at work reads as frying, not as a
+ * letter — and not, at the sheet's size, as a row of pale candles.
  */
 function drawFryerCooking(ctx, cx, cy) {
   const oilY = cy + 13;
@@ -637,13 +647,19 @@ function drawFryerCooking(ctx, cx, cy) {
     ctx.restore();
   };
   const sticks = [[-40, 30, -0.16], [-27, 38, -0.06], [-13, 33, 0.08], [1, 41, -0.02], [15, 35, 0.12], [28, 39, 0.05], [41, 29, 0.17]];
-  for (const [ox, h, rot] of sticks) baton(ox, h, rot, '#f4dc96', '#e3c26e', '#bd9440');
-  // The oil itself, drawn over the batons' feet: a deep gold bath with a
-  // brighter, broken surface.
-  ctx.fillStyle = 'rgba(214,158,44,0.88)';
+  for (const [ox, h, rot] of sticks) baton(ox, h, rot, '#f0cd78', '#d9ae4e', '#bd9440');
+  // The oil itself, drawn over the batons' feet: a deep, hot gold bath with a
+  // brighter, broken surface — dark enough, against the fryer's panel, that
+  // the pale batons read as food in oil and not as sticks in a void.
+  ctx.fillStyle = 'rgba(196,124,24,0.92)';
   ctx.beginPath(); ctx.ellipse(cx, oilY, 55, 12.5, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(246,205,105,0.75)';
+  ctx.fillStyle = 'rgba(233,164,52,0.80)';
   ctx.beginPath(); ctx.ellipse(cx, oilY - 2.5, 51, 8.5, 0, 0, Math.PI * 2); ctx.fill();
+  // A foam ring on the surface line, where the batons break it — the edge
+  // frying is visibly happening along.
+  ctx.strokeStyle = 'rgba(255,240,200,0.85)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(cx, oilY - 2.5, 51, 8.5, 0, 0, Math.PI * 2); ctx.stroke();
   // Bubbles in the oil, clustered at the batons' feet — hash-placed, so a
   // still frame holds them exactly where a moving one would.
   ctx.fillStyle = 'rgba(255,248,220,0.85)';
@@ -795,6 +811,21 @@ function drawKitchen(ctx, state) {
     ctx.lineWidth = wdt;
     ctx.beginPath(); ctx.ellipse(640, 462, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
   }
+  // The rug's weave: short dashes in two quiet tones, hash-placed so they
+  // never move, clipped to the rug's own ellipse — a woven mat on the middle
+  // band's ground instead of one flat sticker of colour. It carries no
+  // information and stays quieter than everything that does.
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(640, 460, 268, 96, 0, 0, Math.PI * 2); ctx.clip();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 210; i++) {
+    const wx = 640 + (hash2(i, 31) - 0.5) * 520;
+    const wy = 460 + (hash2(i, 37) - 0.5) * 176;
+    ctx.strokeStyle = i % 3 === 0 ? 'rgba(245,190,120,0.16)' : 'rgba(122,52,28,0.15)';
+    ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + 9 + hash2(i, 41) * 8, wy); ctx.stroke();
+  }
+  ctx.restore();
   // Counters.
   for (const solid of SOLIDS) {
     ctx.fillStyle = COLORS.counter;
@@ -1529,7 +1560,12 @@ function drawBoard(ctx, state) {
       // already fill both of their lines and keep them.
       const shortPiece = (item) => (item === 'bun' ? 'roll' : item.replace('_grilled', '').replace('_cut', ''));
       const parts = DISHES[main.dish].items.map(shortPiece).join(' · ');
-      text(ctx, parts, x + 70, lineY, 11, '#8a755a', 'left', false);
+      // A one-piece dish has no route to list: its only "make-up" would echo
+      // its piece ("fillet" under Grilled Fillet — the board's barest line).
+      // It prints its process instead, in the same muted voice — the note
+      // its own menu line already uses.
+      const solo = { fillet: 'straight off the grill' }[main.dish];
+      text(ctx, DISHES[main.dish].items.length === 1 && solo ? solo : parts, x + 70, lineY, 11, '#8a755a', 'left', false);
     }
     // The bottom row: what the ticket pays on the left, the seconds left on the right.
     text(ctx, `$${ticket.price} + tip`, x + 10, y + h - 21, 12.5, COLORS.tealDark, 'left');
@@ -1642,10 +1678,18 @@ function drawOverlays(ctx, state) {
     servedList.forEach(({ dish, n }, i) => {
       const colX = i % 2 === 0 ? 480 : 800;
       const y = 326 + Math.floor(i / 2) * 42;
+      // A dish the shift never served wears a dimmed icon as well as a grey
+      // name: colour itself carries the demotion, so the panel cannot read
+      // as six dishes in full colour over a shift that served four kinds.
+      if (n === 0) { ctx.save(); ctx.globalAlpha = 0.45; }
       drawDish(ctx, dish.id, colX - 82, y, 40);
+      if (n === 0) ctx.restore();
       text(ctx, `${dish.name} ×${n}`, colX - 56, y, 15.5, n > 0 ? COLORS.cream : '#71827a', 'left', false);
     });
-    text(ctx, `Dishes served ${state.served}      Walkouts ${state.walkouts}      Best tip $${state.bestTip}`, cx, 490, 17.5, '#cfe0d8', 'center', false);
+    // The number counts completed tickets, not lines — the panel above it
+    // sums to one more (the combo's chips are a line of their own), and the
+    // label says which of the two it means.
+    text(ctx, `Tickets served ${state.served}      Walkouts ${state.walkouts}      Best tip $${state.bestTip}`, cx, 490, 17.5, '#cfe0d8', 'center', false);
     const [letter, title] = gradeFor(state.score);
     text(ctx, `KITCHEN GRADE: ${letter} — ${title}`, cx, 532, 22, COLORS.mustard);
     text(ctx, 'PRESS R TO WORK ANOTHER SHIFT', cx, 578, 17, '#7dff9a');

@@ -1,4 +1,4 @@
-// Last Ticket — shared constants: the room, the counters, the clock and the colours.
+// The Daily Catch — shared constants: the room, the counters, the clock and the colours.
 // Everything that more than one module needs to agree on lives here and nowhere else.
 
 export const VIEW = { width: 1280, height: 800 };
