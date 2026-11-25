@@ -27,7 +27,13 @@ function cover() {
   s.score = 86;
   s.served = 5;
   s.tickets = [
-    ticket(1, [['harbour', false]], 13, 33, 60),
+    // The Harbour Plate is dying — 12 s left of 60 — so the cover carries
+    // the game's own pressure language at the size the judge looks at: the
+    // red zone (halo, hard border, alarm disc, red seconds) and, through
+    // the strain rule, the cook's face. The other two tickets stay calm,
+    // and the score, the served count and everything staged stay exactly
+    // as they were: a good kitchen under pressure, not a failing one.
+    ticket(1, [['harbour', false]], 13, 12, 60),
     ticket(2, [['butty', false], ['fries', false]], 18, 52, 71),
     ticket(3, [['salad', false]], 8, 41, 71),
   ];

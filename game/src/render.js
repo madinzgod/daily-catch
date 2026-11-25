@@ -1195,12 +1195,25 @@ function drawKitchen(ctx, state) {
   }
 }
 
+/**
+ * Whether the cook's face strains: whenever the board is under pressure —
+ * a full five-ticket board, or any ticket in the red zone. The rule is the
+ * same red-zone threshold the tickets themselves use (frac < 0.25), so the
+ * face and the board can never contradict each other: a calm board never
+ * gets a strained cook, and a dying timer always does.
+ */
+export function chefStrained(state) {
+  if (state.phase !== 'play') return false;
+  return state.tickets.length >= 5
+    || state.tickets.some((t) => t.timeLeft / t.timeTotal < 0.25);
+}
+
 function drawChef(ctx, state) {
   const chef = state.chef;
   const bob = Math.sin(chef.walk) * 2.4;
-  // A full board — five tickets, the most the board can hold — is the one
-  // moment the cook's face changes: brows down, mouth flat, sweat flying.
-  const strained = state.phase === 'play' && state.tickets.length >= 5;
+  // The cook's face answers the pressure on the board: brows down, mouth
+  // flat, sweat flying — whenever a ticket is dying or the board is full.
+  const strained = chefStrained(state);
   const x = chef.x;
   const y = chef.y + bob * 0.3;
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
