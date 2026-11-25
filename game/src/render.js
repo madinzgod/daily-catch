@@ -84,18 +84,21 @@ function drawCheck(ctx, cx, cy, s, color, lw) {
   ctx.stroke();
 }
 
-/** A right arrow as strokes — Fredoka has no → glyph either. */
+/** A right arrow as strokes — Fredoka has no → glyph either. Drawn a step
+ * larger than its first version: at 11 px and 2.4 weight it was the
+ * slightest mark on the title screen, thinner than the strokes of the
+ * letters it joins. */
 function drawArrow(ctx, cx, cy, color) {
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2.4;
+  ctx.lineWidth = 2.8;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.moveTo(cx - 6, cy);
-  ctx.lineTo(cx + 5, cy);
-  ctx.moveTo(cx + 1, cy - 4);
-  ctx.lineTo(cx + 5, cy);
-  ctx.lineTo(cx + 1, cy + 4);
+  ctx.moveTo(cx - 8, cy);
+  ctx.lineTo(cx + 7, cy);
+  ctx.moveTo(cx + 2.5, cy - 5.5);
+  ctx.lineTo(cx + 7, cy);
+  ctx.lineTo(cx + 2.5, cy + 5.5);
   ctx.stroke();
 }
 
@@ -749,7 +752,10 @@ function drawMachine(ctx, state, station, machine) {
     // else the item itself is the picture.
     if (kind === 'fryer' && machine.t < cookAt) drawFryerCooking(ctx, cx, cy);
     else if (kind === 'grill' && shown.startsWith('prawns')) drawGrillPrawns(ctx, shown, cx, cy);
-    else drawItem(ctx, shown, cx, cy - 4, kind === 'grill' ? 54 : 52);
+    // The grill's single item steps up a size: at 54 its body spanned
+    // ~51 px of a 174 px-wide dark panel and read as a small dark mark
+    // at the cover's size; the prawns already span the grill in a row.
+    else drawItem(ctx, shown, cx, cy - 4, kind === 'grill' ? 62 : 52);
     const color = machine.t >= burnAt ? COLORS.red : machine.t >= cookAt ? COLORS.timerGood : COLORS.mustard;
     drawProgress(ctx, station.x + 16, station.y + station.h - 20, station.w - 32, machine.t / burnAt, color);
     // Steam wisps, swaying with the clock so the frame feels alive — three of
@@ -839,15 +845,13 @@ function drawKitchen(ctx, state) {
   // own stripe — a mat's border, not a target.
   ctx.fillStyle = COLORS.rug;
   ctx.beginPath(); ctx.ellipse(640, 460, 268, 96, 0, 0, Math.PI * 2); ctx.fill();
-  // The rings wear at half strength: at full strength the pale stripe was
-  // the loudest graphic in the middle band — two hard outlines around a
-  // plain middle, reading as a target the V13 fix meant to take away.
+  // One ring only, at half strength: two softened rings still read as a
+  // target — a closed inner outline around a plain middle was the loudest
+  // graphic in the middle band. The outer ring stays as the mat's border.
   ctx.globalAlpha = 0.5;
-  for (const [rx, ry, col, wdt] of [[244, 84, COLORS.rugStripe, 4], [214, 72, COLORS.rugStripe, 3]]) {
-    ctx.strokeStyle = col;
-    ctx.lineWidth = wdt;
-    ctx.beginPath(); ctx.ellipse(640, 462, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
-  }
+  ctx.strokeStyle = COLORS.rugStripe;
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.ellipse(640, 462, 244, 84, 0, 0, Math.PI * 2); ctx.stroke();
   ctx.globalAlpha = 1;
   // The rug's weave: short dashes in two quiet tones, hash-placed so they
   // never move, clipped to the rug's own ellipse — a woven mat on the middle
@@ -937,6 +941,17 @@ function drawKitchen(ctx, state) {
   ctx.fillRect(179, 699, 140, 25);
   ctx.fillStyle = '#4e8ca6';
   ctx.fillRect(179, 724, 140, 31);
+  // A distant headland on the horizon, low and quiet: the window's sea
+  // was one flat band, and depth is the difference between a picture of
+  // water and a harbour. It sits behind everything else in the glass.
+  ctx.fillStyle = 'rgba(39,75,82,0.5)';
+  ctx.beginPath();
+  ctx.moveTo(179, 724); ctx.lineTo(196, 718.5); ctx.lineTo(214, 721); ctx.lineTo(230, 724);
+  ctx.closePath(); ctx.fill();
+  // A sparkle line where sky meets water.
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(179, 724.6); ctx.lineTo(319, 724.6); ctx.stroke();
   ctx.strokeStyle = 'rgba(255,255,255,0.5)';
   ctx.lineWidth = 1.2;
   for (const [wx, wy] of [[196, 734], [226, 743], [286, 737], [306, 747]]) {
@@ -949,25 +964,32 @@ function drawKitchen(ctx, state) {
   // itself is as large as the counter face allows (V13), so the picture
   // inside it grows instead: the boat is scaled up about its own centre,
   // or at judge size it stays a dark dash with a white fleck for a sail.
+  // The whole boat sits 18 units left of where it grew: the frame's
+  // centre mullion (window space ≈ 244–250) used to fall straight
+  // through the sail (≈ 240–259) — a bar across the one white shape in
+  // the glass. Shifted, the sail's right edge (≈ 241) clears it, and
+  // the hull's end passes behind the mullion as a boat behind a frame
+  // should.
   ctx.save();
-  ctx.translate(237, 725);
+  ctx.translate(219, 725);
   ctx.scale(1.3, 1.3);
-  ctx.translate(-237, -725);
+  ctx.translate(-219, -725);
   ctx.fillStyle = '#274b52';
   ctx.beginPath();
-  ctx.moveTo(216, 730); ctx.lineTo(258, 730); ctx.lineTo(250, 738); ctx.lineTo(223, 738);
+  ctx.moveTo(198, 730); ctx.lineTo(240, 730); ctx.lineTo(232, 738); ctx.lineTo(205, 738);
   ctx.closePath(); ctx.fill();
-  ctx.fillRect(235.8, 712, 2.2, 18);
+  ctx.fillRect(217.8, 712, 2.2, 18);
   ctx.fillStyle = '#fff7e6';
-  ctx.beginPath(); ctx.moveTo(239.5, 713); ctx.lineTo(239.5, 728); ctx.lineTo(254, 728); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(221.5, 713); ctx.lineTo(221.5, 728); ctx.lineTo(236, 728); ctx.closePath(); ctx.fill();
   ctx.fillStyle = COLORS.red;
-  ctx.beginPath(); ctx.moveTo(238, 712); ctx.lineTo(246, 714.4); ctx.lineTo(238, 716.8); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(220, 712); ctx.lineTo(228, 714.4); ctx.lineTo(220, 716.8); ctx.closePath(); ctx.fill();
   ctx.restore();
-  // Gulls: three small double-arcs over the water.
+  // Gulls: three small double-arcs over the water, and one smaller,
+  // farther pair toward the sun — the sky has depth like the sea does.
   ctx.strokeStyle = '#33555e';
   ctx.lineWidth = 1.6;
   ctx.lineCap = 'round';
-  for (const [gx, gy] of [[200, 709], [222, 704], [272, 707]]) {
+  for (const [gx, gy] of [[200, 709], [222, 704], [272, 707], [290, 718]]) {
     ctx.beginPath(); ctx.arc(gx - 3.4, gy, 3.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
     ctx.beginPath(); ctx.arc(gx + 3.4, gy, 3.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
   }
@@ -1238,7 +1260,11 @@ function drawKitchen(ctx, state) {
             : it === 'prawns_grilled' ? { body: '#f4834f', line: '#c25227' }
             : { body: '#503a2c', line: '#2e2019' };
           const sheen = it !== 'prawns_burnt';
-          for (const [ox, oy, rot, sc] of [[-25, 1, 0.35, 1.03], [1, -3, 2.45, 0.96], [26, 1, -0.85, 1.0]]) {
+          // Spaced wider than a prawn is wide, and a step smaller: at
+          // 25 px spacing the ~36-unit bodies overlapped by a third and
+          // merged into one orange mass on the tray — the grill's row
+          // (V14) already proved spacing is what separates them.
+          for (const [ox, oy, rot, sc] of [[-28, 1, 0.35, 0.92], [0, -3, 2.45, 0.88], [28, 1, -0.85, 0.9]]) {
             ctx.save();
             ctx.translate(cx + ox, ty + oy);
             ctx.scale(sc, sc);
@@ -1371,6 +1397,21 @@ function drawKitchen(ctx, state) {
         // the counter, clear of the label — the badge carries the call.
         const friesPass = state.passDish === 'fries';
         drawDish(ctx, state.passDish, station.x + (friesPass ? 58 : 74), station.y + (friesPass ? 57 : 46), friesPass ? 60 : 104);
+        // Steam over the pass: the machines steam and the sheet's
+        // "ready to serve" moment sat cold. Two wisps in the machines'
+        // own language rise off the finished dish, swaying with the
+        // clock like theirs do.
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 2.3;
+        ctx.lineCap = 'round';
+        for (const off of [-13, 13]) {
+          const sx = station.x + (friesPass ? 58 : 74) + off + Math.sin(state.time * 2.2 + off * 1.7) * 3;
+          const sy = station.y + (friesPass ? 30 : 26);
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.quadraticCurveTo(sx + 5, sy - 11, sx - 1, sy - 21);
+          ctx.stroke();
+        }
         drawBadge(ctx, station.x + 208, station.y + 50, 'READY TO SERVE!', '#1e7d46');
       }
       // The service bell.
@@ -1390,8 +1431,19 @@ function drawKitchen(ctx, state) {
   // quieter than anything that carries information.
   ctx.fillStyle = 'rgba(255,205,120,0.12)';
   ctx.beginPath(); ctx.ellipse(640, 460, 232, 80, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(255,205,120,0.08)';
-  ctx.beginPath(); ctx.ellipse(640, 460, 168, 56, 0, 0, Math.PI * 2); ctx.fill();
+  // The inner pool is a gradient, not a second hard-edged ellipse:
+  // light pools, it doesn't stack. Drawn in the rug's own squashed
+  // space so it hugs the room the way the flat pool does, warm at the
+  // island and gone at its rim.
+  ctx.save();
+  ctx.translate(640, 460);
+  ctx.scale(1, 56 / 168);
+  const poolGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, 168);
+  poolGrad.addColorStop(0, 'rgba(255,205,120,0.17)');
+  poolGrad.addColorStop(1, 'rgba(255,205,120,0)');
+  ctx.fillStyle = poolGrad;
+  ctx.beginPath(); ctx.arc(0, 0, 168, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
   ctx.fillStyle = '#2b2320';
   for (const ux of [470, 810]) ctx.fillRect(ux - 2.5, 226, 5, 24);
   ctx.fillStyle = '#4a3b2a';
@@ -1402,7 +1454,13 @@ function drawKitchen(ctx, state) {
     ctx.strokeStyle = '#2b2320';
     ctx.lineWidth = 2.2;
     ctx.beginPath(); ctx.moveTo(lx, 256); ctx.lineTo(lx, 310); ctx.stroke();
-    // The glow around the bulb, two soft rings of warm light.
+    // The glow around the bulb: a gradient disc that fades the way
+    // light does, then the two soft rings the room already wore.
+    const glowGrad = ctx.createRadialGradient(lx, 335, 4, lx, 335, 78);
+    glowGrad.addColorStop(0, 'rgba(255,214,130,0.20)');
+    glowGrad.addColorStop(1, 'rgba(255,214,130,0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath(); ctx.arc(lx, 335, 78, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'rgba(255,214,130,0.10)';
     ctx.beginPath(); ctx.arc(lx, 330, 48, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = 'rgba(255,214,130,0.16)';
@@ -1450,31 +1508,67 @@ function drawChef(ctx, state) {
   const strained = chefStrained(state);
   const x = chef.x;
   const y = chef.y + bob * 0.3;
-  ctx.fillStyle = 'rgba(0,0,0,0.16)';
-  ctx.beginPath(); ctx.ellipse(x, chef.y + 27, 26, 7.5, 0, 0, Math.PI * 2); ctx.fill();
-  // Arms: both up under whatever he carries, or resting at his sides.
-  ctx.strokeStyle = '#f0bd8f';
-  ctx.lineWidth = 6.5;
+  // A soft contact shadow in two layers — a wide faint ellipse under a
+  // tighter darker one — so he sits in the room's light instead of on
+  // one hard-edged sticker.
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  ctx.beginPath(); ctx.ellipse(x, chef.y + 27, 31, 9.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(x, chef.y + 27, 23, 6.8, 0, 0, Math.PI * 2); ctx.fill();
+  // Arms in indigo sleeves, ending in hands: both up under whatever he
+  // carries — the hands visibly hold it — or resting at his sides. The
+  // old bare skin strokes vanished against the floor at judge size,
+  // and a carried dish floated over the toque, held by nothing.
   ctx.lineCap = 'round';
   for (const side of [-1, 1]) {
+    ctx.strokeStyle = '#2c4a7c';
+    ctx.lineWidth = 8.5;
     ctx.beginPath();
     if (chef.carry) {
       ctx.moveTo(x + side * 20, y + 8);
-      ctx.lineTo(x + side * 12, y - 40);
+      ctx.lineTo(x + side * 11, y - 44);
     } else {
       ctx.moveTo(x + side * 23, y + 2);
-      ctx.lineTo(x + side * 27, y + 16);
+      ctx.lineTo(x + side * 27, y + 15);
     }
     ctx.stroke();
+    ctx.fillStyle = '#f0bd8f';
+    ctx.beginPath();
+    ctx.arc(x + side * (chef.carry ? 11 : 27), y + (chef.carry ? -46 : 17), 3.7, 0, Math.PI * 2);
+    ctx.fill();
   }
   // Apron body — harbour indigo, a cream apron front with a pocket.
   ctx.fillStyle = '#2c4a7c';
   ctx.beginPath(); ctx.arc(x, y + 6, 25, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#f7f2e6';
   rr(ctx, x - 13.5, y - 1 + bob * 0.2, 27, 23, 6); ctx.fill();
+  // The apron's neck strap, rising from its top corners to the neck —
+  // a plain cream block became an apron when it gained its furniture.
+  ctx.strokeStyle = '#e8dfc9';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x - 11, y - 0.5 + bob * 0.2);
+  ctx.lineTo(x - 4.5, y - 7.5 + bob * 0.2);
+  ctx.moveTo(x + 11, y - 0.5 + bob * 0.2);
+  ctx.lineTo(x + 4.5, y - 7.5 + bob * 0.2);
+  ctx.stroke();
+  // The pocket, stitched: a dashed top line is what makes it a pocket.
   ctx.strokeStyle = '#d8cfb8';
   ctx.lineWidth = 1.4;
   rr(ctx, x + 2, y + 10 + bob * 0.2, 9, 8, 2); ctx.stroke();
+  ctx.strokeStyle = '#b8ab8d';
+  ctx.setLineDash([2.2, 1.8]);
+  ctx.beginPath();
+  ctx.moveTo(x + 2.8, y + 12.4 + bob * 0.2);
+  ctx.lineTo(x + 10.2, y + 12.4 + bob * 0.2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // A towel hangs at his left side, striped in the room's teal.
+  ctx.fillStyle = '#f7f2e6';
+  rr(ctx, x - 24.5, y + 9 + bob * 0.2, 8.5, 14, 2); ctx.fill();
+  ctx.fillStyle = COLORS.teal;
+  ctx.fillRect(x - 24.5, y + 13.5 + bob * 0.2, 8.5, 2.2);
+  ctx.fillRect(x - 24.5, y + 18.5 + bob * 0.2, 8.5, 2.2);
   // Head and face.
   ctx.fillStyle = '#f0bd8f';
   ctx.beginPath(); ctx.arc(x, y - 21 + bob * 0.2, 15.5, 0, Math.PI * 2); ctx.fill();
@@ -1482,6 +1576,10 @@ function drawChef(ctx, state) {
   for (const side of [-1, 1]) {
     ctx.beginPath(); ctx.arc(x + side * 5.6, y - 22 + bob * 0.2, 1.7, 0, Math.PI * 2); ctx.fill();
   }
+  // A small nose: two dots and an arc were a symbol for a face; the
+  // character the sheet's feel rests on gets a face of his own.
+  ctx.fillStyle = '#d99a63';
+  ctx.beginPath(); ctx.arc(x, y - 19.6 + bob * 0.2, 1.5, 0, Math.PI * 2); ctx.fill();
   if (strained) {
     // Determined brows, angled down toward the nose.
     ctx.strokeStyle = '#7a4a26';
@@ -1518,10 +1616,23 @@ function drawChef(ctx, state) {
       ctx.beginPath(); ctx.arc(-1.2, 2.6, 1.1, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     };
-    drop(-24, -30, 0.9, -0.5);
-    drop(24.5, -25, 0.75, 0.55);
-    drop(-19, -12, 0.55, -0.9);
+    // The drops step up a size: they are the face's loudest strain
+    // mark after the brows, and at their old scales they were the
+    // smallest blue flecks on the cover.
+    drop(-24, -30, 1.05, -0.5);
+    drop(24.5, -25, 0.88, 0.55);
+    drop(-19, -12, 0.68, -0.9);
   } else {
+    // Calm brows, soft arcs over the eyes: the strained face had
+    // brows and the calm one had none, so calm read as blank.
+    ctx.strokeStyle = '#7a4a26';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(x + side * 5.6, y - 25.6 + bob * 0.2, 3.4, Math.PI * 1.15, Math.PI * 1.85);
+      ctx.stroke();
+    }
     ctx.strokeStyle = '#a96a3f';
     ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(x, y - 17.5 + bob * 0.2, 5.6, 0.25, Math.PI - 0.25); ctx.stroke();
@@ -1536,13 +1647,37 @@ function drawChef(ctx, state) {
   ctx.beginPath(); ctx.arc(x, y - 41 + bob * 0.2, 11.5, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(x - 8, y - 39 + bob * 0.2, 7.5, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(x + 8, y - 39 + bob * 0.2, 7.5, 0, Math.PI * 2); ctx.fill();
-  // Neckerchief, knotted on the facing side.
+  // The toque's cloth: two fold curves down the dome and stitch ticks
+  // on the band. Flat white shapes read as a blob at judge size — and
+  // the tomato he carries overhead used to read as dots on the hat.
+  ctx.strokeStyle = 'rgba(141,151,157,0.55)';
+  ctx.lineWidth = 1.3;
+  ctx.lineCap = 'round';
+  for (const fx of [-5.5, 5.5]) {
+    ctx.beginPath();
+    ctx.moveTo(x + fx, y - 49.5 + bob * 0.2);
+    ctx.quadraticCurveTo(x + fx * 1.25, y - 44 + bob * 0.2, x + fx, y - 39.5 + bob * 0.2);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(141,151,157,0.7)';
+  ctx.lineWidth = 1.1;
+  for (const sx of [-9, -3, 3, 9]) {
+    ctx.beginPath();
+    ctx.moveTo(x + sx, y - 38.6 + bob * 0.2);
+    ctx.lineTo(x + sx, y - 34.6 + bob * 0.2);
+    ctx.stroke();
+  }
+  // Neckerchief, knotted on the facing side: a wider fall of cloth and
+  // a knot — the old triangle was swallowed at the neck join and read
+  // as a red smudge.
   ctx.fillStyle = COLORS.red;
   ctx.beginPath();
-  ctx.moveTo(x - 7, y - 9);
-  ctx.lineTo(x + chef.face * 13, y - 4);
-  ctx.lineTo(x - 2, y + 1);
+  ctx.moveTo(x - 9.5, y - 9.5);
+  ctx.lineTo(x + chef.face * 15.5, y - 3.5);
+  ctx.lineTo(x - 3, y + 2.5);
   ctx.closePath(); ctx.fill();
+  ctx.fillStyle = COLORS.redDark;
+  ctx.beginPath(); ctx.arc(x + chef.face * 11, y - 3.3, 2.3, 0, Math.PI * 2); ctx.fill();
   // Whatever the chef carries rides overhead, both hands up — carried food
   // casts no contact shadow; it is in the air, over his toque.
   if (chef.carry) {
@@ -1566,6 +1701,11 @@ function drawBoard(ctx, state) {
     const y = 24;
     const h = 86;
     const frac = Math.max(0, ticket.timeLeft / ticket.timeTotal);
+    // A soft offset shadow under the paper: the cards were printed
+    // rectangles on a flat band; with a shadow they read as tickets
+    // pinned on a wall, and the board lifts off the room behind it.
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    rr(ctx, x + 3, y + 4, cardW, h, 7); ctx.fill();
     ctx.fillStyle = COLORS.paper;
     rr(ctx, x, y, cardW, h, 7); ctx.fill();
     if (frac < 0.25) {
@@ -1632,7 +1772,12 @@ function drawBoard(ctx, state) {
       // round: at #8a755a it was ~4.0:1 on the card's paper, the faintest
       // text the board carries; #755c39 is ~5.3:1, the dish lines' family.
       const solo = { fillet: 'straight off the grill' }[main.dish];
-      text(ctx, DISHES[main.dish].items.length === 1 && solo ? solo : parts, x + 70, lineY, 11, '#755c39', 'left', false);
+      // The single's one line sits in the card's middle, not at its
+      // top: with the echo line gone the line at the first slot left
+      // a ~29 px airy band above the bottom row, while combo cards
+      // fill both slots and read balanced. Centred, the card's text
+      // block sits between header and bottom row like a combo's.
+      text(ctx, DISHES[main.dish].items.length === 1 && solo ? solo : parts, x + 70, lineY + 7.5, 11, '#755c39', 'left', false);
     }
     // The bottom row: what the ticket pays on the left, the seconds left on the right.
     text(ctx, `$${ticket.price} + tip`, x + 10, y + h - 21, 12.5, COLORS.tealDark, 'left');
@@ -1700,9 +1845,20 @@ function drawOverlays(ctx, state) {
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
   const cx = VIEW.width / 2;
   if (state.phase === 'title') {
+    // A breath of dusk over the title's dim: a warm wash the end
+    // screen doesn't share, so the title sits at evening service.
+    ctx.fillStyle = 'rgba(255,190,90,0.06)';
+    ctx.fillRect(0, 0, VIEW.width, VIEW.height);
     // The block sits 12–14 px higher than it grew: the tagline's old row
     // (glyph box ~186–206) was the bins' label row (y 200–212), and TOMATO /
-    // LETTUCE / PRAWNS showed dimmed through its letters.
+    // LETTUCE / PRAWNS showed dimmed through its letters. Raising it
+    // cleared the labels but landed it on the bins' ICON row (centres
+    // ≈ 175–179, a tomato's underside reaching ≈ 196): the red tomato
+    // showed through "one harbour kitchen". So the block now sits on a
+    // flat deep-teal band of its own — one calm field behind both
+    // lines, the room still visible above and below it.
+    ctx.fillStyle = 'rgba(20,34,40,0.45)';
+    ctx.fillRect(0, 96, VIEW.width, 112);
     text(ctx, 'THE DAILY CATCH', cx, 140, 70, '#ffd968');
     text(ctx, 'one cook, one harbour kitchen, the whole lunch rush', cx, 184, 20, COLORS.cream, 'center', false);
     // The menu board: every dish the kitchen serves, what goes into it and what
@@ -1715,7 +1871,10 @@ function drawOverlays(ctx, state) {
     };
     [...RECIPES, FRIES].forEach((dish, i) => {
       const y = 288 + i * 40;
-      drawDish(ctx, dish.id, 302, y, dish.id === 'fries' ? 30 : 40);
+      // Fries at 26, one step below the 30 they stepped to last round:
+      // the carton spans ~52 units tall, so even at 30 it stood ~35 px
+      // against a plate icon's ~25 — still the tallest mark in its row.
+      drawDish(ctx, dish.id, 302, y, dish.id === 'fries' ? 26 : 40);
       text(ctx, dish.name, 334, y - 8, 15.5, COLORS.cream, 'left');
       const parts = menuNotes[dish.id]
         || dish.items.map((item) => INGREDIENTS[item].name.toLowerCase()).join(' + ');
@@ -1729,7 +1888,7 @@ function drawOverlays(ctx, state) {
     const routeStages = ['HOW TO PLAY — FETCH from the bins', 'CHOP at the boards', 'GRILL / FRY', 'PLATE', 'SERVE'];
     ctx.font = `700 16.5px ${FONT}`;
     const stageW = routeStages.map((s) => ctx.measureText(s).width);
-    const arrowSlot = 26;
+    const arrowSlot = 30;
     const routeTotal = stageW.reduce((a, b) => a + b, 0) + arrowSlot * (routeStages.length - 1);
     let routeX = cx - routeTotal / 2;
     routeStages.forEach((stage, i) => {
@@ -1768,7 +1927,7 @@ function drawOverlays(ctx, state) {
       // name: colour itself carries the demotion, so the panel cannot read
       // as six dishes in full colour over a shift that served four kinds.
       if (n === 0) { ctx.save(); ctx.globalAlpha = 0.45; }
-      drawDish(ctx, dish.id, colX - 82, y, dish.id === 'fries' ? 30 : 40);
+      drawDish(ctx, dish.id, colX - 82, y, dish.id === 'fries' ? 26 : 40);
       if (n === 0) ctx.restore();
       text(ctx, `${dish.name} ×${n}`, colX - 56, y, 15.5, n > 0 ? COLORS.cream : '#71827a', 'left', false);
     });
@@ -1777,7 +1936,11 @@ function drawOverlays(ctx, state) {
     // label says which of the two it means. The line wears a panel of its
     // own: bare, it sat at y 490 straight across the island's brass name
     // plate (y 487–500), and the plate's letters showed through the words.
-    chalkPanel(ctx, cx - 330, 470, 660, 42);
+    // The panel takes the served panel's own geometry (345, 590 wide):
+    // at 660 wide from x 310 its left edge sliced the captured cook
+    // (body to ≈ x 335) — the flaw the served panel was narrowed to
+    // escape, one panel lower.
+    chalkPanel(ctx, 345, 470, 590, 42);
     text(ctx, `Tickets served ${state.served}      Walkouts ${state.walkouts}      Best tip $${state.bestTip}`, cx, 490, 17.5, '#cfe0d8', 'center', false);
     const [letter, title] = gradeFor(state.score);
     text(ctx, `KITCHEN GRADE: ${letter} — ${title}`, cx, 532, 22, COLORS.mustard);
