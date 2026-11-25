@@ -571,42 +571,62 @@ function drawMachine(ctx, state, station, machine) {
 
 function drawKitchen(ctx, state) {
   // The floor: warm harbour-deck planks across the whole room — honey wood with
-  // staggered butt joints and visible grain, kept a step quieter than the
-  // counters and the food so the room has depth without shouting.
-  ctx.fillStyle = '#e9d6ae';
+  // staggered butt joints and visible grain. V10 takes it one step deeper than
+  // V4 cut it: a richer base, alternating rows washed warm amber and deep
+  // brown, darker seams and stronger grain, so at contact-sheet size the room
+  // reads as a wooden kitchen and not a pale void. It stays a step quieter
+  // than the counters and the food — everything that carries information is
+  // drawn over it, never on it.
+  ctx.fillStyle = '#dec48f';
   ctx.fillRect(0, BOARD_H, VIEW.width, VIEW.height - BOARD_H);
   const plankH = 32;
   const plankLen = 256;
   for (let row = 0, y = BOARD_H; y < VIEW.height; row++, y += plankH) {
-    ctx.fillStyle = row % 2 ? 'rgba(171,124,72,0.13)' : 'rgba(120,84,46,0.08)';
+    ctx.fillStyle = row % 2 ? 'rgba(198,130,60,0.17)' : 'rgba(130,88,46,0.15)';
     ctx.fillRect(0, y, VIEW.width, plankH);
-    ctx.strokeStyle = '#bd9a67';
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = '#a87e45';
+    ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, y + plankH); ctx.lineTo(VIEW.width, y + plankH); ctx.stroke();
     const startX = -((row * 173) % plankLen);
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.4;
     for (let x = startX, p = 0; x < VIEW.width; x += plankLen, p++) {
       if (x > 0) {
         ctx.beginPath(); ctx.moveTo(x, y + 3); ctx.lineTo(x, y + plankH - 3); ctx.stroke();
       }
       // A per-plank tint shift, so the boards read as separate pieces of wood.
       if (hash2(row * 11, p * 3) > 0.45) {
-        ctx.fillStyle = 'rgba(150,105,58,0.06)';
+        ctx.fillStyle = 'rgba(146,100,54,0.11)';
         ctx.fillRect(Math.max(0, x), y + 1, Math.min(plankLen, VIEW.width - x), plankH - 2);
       }
       // Two grain streaks per plank, placed by hash so they never move.
-      ctx.strokeStyle = 'rgba(105,74,40,0.20)';
-      ctx.lineWidth = 1.1;
+      ctx.strokeStyle = 'rgba(101,70,36,0.27)';
+      ctx.lineWidth = 1.3;
       for (let g = 0; g < 2; g++) {
         const gx = x + 24 + hash2(row * 3 + g, p) * (plankLen - 90);
         const gy = y + 8 + hash2(p * 7, row + g * 13) * 16;
         const gl = 22 + hash2(row + g, p * 5) * 30;
         ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + gl, gy); ctx.stroke();
       }
-      ctx.strokeStyle = '#bd9a67';
-      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = '#a87e45';
+      ctx.lineWidth = 1.4;
     }
   }
+  // A soft vignette toward the walls, in the renderer's own flat language:
+  // concentric rings of deep brown stroked in a squashed space so they hug
+  // the room's shape, each ring a step stronger than the one inside it. The
+  // working middle of the room — the island, the rug, the cook's ground —
+  // sits inside the innermost ring and keeps the lamplight; only the floor's
+  // outer ground falls away. The counters, stations, food, cook and popups
+  // are all drawn after this, untouched by it.
+  ctx.save();
+  ctx.translate(640, 462);
+  ctx.scale(1, 0.66);
+  for (let i = 0; i < 9; i++) {
+    ctx.strokeStyle = `rgba(94,60,26,${(0.02 + i * 0.016).toFixed(3)})`;
+    ctx.lineWidth = 45;
+    ctx.beginPath(); ctx.arc(0, 0, 400 + i * 44, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
   // One soft braided rug, and only one: under the island, ringed in the room's colours.
   ctx.fillStyle = COLORS.rug;
   ctx.beginPath(); ctx.ellipse(640, 462, 240, 78, 0, 0, Math.PI * 2); ctx.fill();
@@ -753,8 +773,12 @@ function drawKitchen(ctx, state) {
     drawStationBase(ctx, station, isActive, state.shake === station.id && state.shakeT > 0);
     const cx = station.x + station.w / 2;
     if (station.kind === 'bin') {
-      drawItem(ctx, station.item, cx - 26, station.y + 32, 40);
-      drawItem(ctx, station.item, cx + 24, station.y + 36, 34);
+      // The counter's ingredients, drawn a step larger than the hands and the
+      // boards use: on the contact sheet the bins are criterion one's
+      // "ingredients on the counter", and at 40/34 they read small — 46/40
+      // fills the panel without touching its edges or the label beneath.
+      drawItem(ctx, station.item, cx - 26, station.y + 29, 46);
+      drawItem(ctx, station.item, cx + 24, station.y + 33, 40);
       text(ctx, station.label, cx, station.y + station.h - 10, 12, '#22382e');
     } else if (station.kind === 'grill') {
       drawMachine(ctx, state, station, state.grill);
