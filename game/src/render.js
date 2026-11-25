@@ -5,6 +5,9 @@
 import { BOARD_H, COLORS, FRYER_BURN, FRYER_COOK, GRILL_BURN, GRILL_COOK, SOLIDS, STATIONS, VIEW } from './config.js';
 import { DISHES, COOKED, FRIES, INGREDIENTS, RECIPES, recipeForStack } from './recipes.js';
 import { nearestStation } from './actions.js';
+import { heat } from './kitchen.js';
+import { boardRush } from './orders.js';
+import { guestFor } from './guests.js';
 
 /**
  * Draw one whole frame of the game from the state — every pixel the game ever
@@ -500,9 +503,12 @@ function drawPlateSpread(ctx, items, x, y, s) {
   ctx.beginPath(); ctx.ellipse(0, 9, 45, 12.5, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.beginPath(); ctx.ellipse(-20, 5.5, 16, 4, -0.15, 0, Math.PI * 2); ctx.fill();
+  // A lone piece takes the LEFT slot: it used to sit at −16 alone and
+  // jump to −28 when a second piece joined it — food already placed
+  // teleported sideways as the plate built (AUDIT-V19 F5).
   const slots = items.length >= 3 ? [[-29, 1], [0, -6], [29, 1]]
     : items.length === 2 ? [[-28, 0], [28, 0]]
-    : [[-16, 0]];
+    : [[-28, 0]];
   if (items.length < 3) {
     // The dashed ring marks the empty place, so it is drawn on the
     // plate, under the food: drawn after the items, its arc struck
@@ -567,6 +573,22 @@ function drawBadge(ctx, x, y, label, bg) {
   ctx.lineWidth = 1.6;
   rr(ctx, x - w / 2, y - 11.5, w, 23, 7); ctx.stroke();
   text(ctx, label, x, y + 0.5, 13.5, '#ffffff');
+}
+
+/**
+ * A small four-point star, drawn as a path — the mark for the day's
+ * featured dish and the glint of a fresh serve. Drawn, never a glyph:
+ * the game's typeface has no star, and a fallback glyph would seam.
+ */
+function drawStar(ctx, cx, cy, r, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r);
+  ctx.quadraticCurveTo(cx, cy, cx + r, cy);
+  ctx.quadraticCurveTo(cx, cy, cx, cy + r);
+  ctx.quadraticCurveTo(cx, cy, cx - r, cy);
+  ctx.quadraticCurveTo(cx, cy, cx, cy - r);
+  ctx.fill();
 }
 
 /** A small deterministic hash of two coordinates, for floor grain that never moves. */
@@ -765,7 +787,11 @@ function drawMachine(ctx, state, station, machine) {
     // The grill's single item steps up a size: at 54 its body spanned
     // ~51 px of a 174 px-wide dark panel and read as a small dark mark
     // at the cover's size; the prawns already span the grill in a row.
-    else drawItem(ctx, shown, cx, cy - 4, kind === 'grill' ? 62 : 52);
+    else if (kind === 'grill') drawItem(ctx, shown, cx, cy - 4, 62);
+    // The fryer's finished carton steps DOWN a size: at 52 its sticks
+    // reached ~11 px above the fryer's inner panel — food escaping its
+    // machine (AUDIT-V19 F7). At 42, centred lower, it stays inside.
+    else drawItem(ctx, shown, cx, cy + 2, 42);
     // The bar is the clock, the badge below is the food's state: the bar
     // fills toward the burn point, and its final stretch turns red —
     // "nearly out of time", the same language the tickets' draining
@@ -774,11 +800,16 @@ function drawMachine(ctx, state, station, machine) {
     // burn window, 0.6 s from burnt (AUDIT-V18 W8).
     const color = machine.t >= burnAt || machine.t / burnAt >= 0.85 ? COLORS.red
       : machine.t >= cookAt ? COLORS.timerGood : COLORS.mustard;
-    drawProgress(ctx, station.x + 16, station.y + station.h - 20, station.w - 32, machine.t / burnAt, color);
+    // The bar rides 4 px higher than it used to: it hung 6 px off the
+    // frame's bottom edge and its row leaned on the label's glyphs
+    // (AUDIT-V19 F6).
+    drawProgress(ctx, station.x + 16, station.y + station.h - 24, station.w - 32, machine.t / burnAt, color);
     // Steam wisps, swaying with the clock so the frame feels alive — three of
     // them, tall enough to read above both machines at contact-sheet size.
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 2.3;
+    // Past the burn point they turn to dark smoke: burnt food used to steam
+    // white exactly like fresh food (AUDIT-V19 F3).
+    ctx.strokeStyle = machine.t >= burnAt ? 'rgba(88,78,72,0.55)' : 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = machine.t >= burnAt ? 3 : 2.3;
     ctx.lineCap = 'round';
     for (const off of [-17, 0, 17]) {
       ctx.beginPath();
@@ -919,6 +950,28 @@ function drawKitchen(ctx, state) {
   }
   ctx.fillStyle = 'rgba(255,255,255,0.18)';
   ctx.fillRect(20, BOARD_H + 7, 1240, 3);
+  // The wall clock on the tiles over the back counter (AUDIT-V19 D3): its
+  // hands are the real shift clock — the minute hand sweeps the full dial
+  // across the shift, so the room itself tells the time the HUD numbers.
+  {
+    const progress = 1 - Math.max(0, state.shiftLeft) / 150;
+    ctx.fillStyle = '#fff7e6';
+    ctx.beginPath(); ctx.arc(640, 134, 11.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#5f4f3c';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(640, 134, 11.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#22382e';
+    ctx.lineCap = 'round';
+    const hand = (angle, len, wdt) => {
+      ctx.lineWidth = wdt;
+      ctx.beginPath();
+      ctx.moveTo(640, 134);
+      ctx.lineTo(640 + Math.sin(angle) * len, 134 - Math.cos(angle) * len);
+      ctx.stroke();
+    };
+    hand(progress * Math.PI, 5.5, 2.2);
+    hand(progress * Math.PI * 2, 8.5, 1.6);
+  }
   // The dresser on the right counter: a shelf of preserve jars over a stack of
   // plates, pure set dressing — this corner is the pantry.
   ctx.fillStyle = '#5f4f3c';
@@ -948,6 +1001,33 @@ function drawKitchen(ctx, state) {
     ctx.beginPath(); ctx.arc(1208, 492, 13, a, a + 0.7); ctx.stroke();
   }
   text(ctx, 'PANTRY', 1175, 448, 11, COLORS.ink);
+  // The pantry gull, perched on the dresser's shelf end (AUDIT-V19 D4).
+  // It minds its own business — until the fryer is working, when it turns
+  // its head and watches the chips like everyone else in a harbour town.
+  {
+    const watching = Boolean(state.fryer.item);
+    ctx.strokeStyle = '#c99635';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(1225, 424); ctx.lineTo(1225, 428); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(1231, 424); ctx.lineTo(1231, 428); ctx.stroke();
+    ctx.fillStyle = '#f4f1e6';
+    ctx.beginPath(); ctx.ellipse(1228, 419, 10, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#dfe5e8';
+    ctx.beginPath();
+    ctx.moveTo(1236, 415); ctx.lineTo(1245, 412); ctx.lineTo(1237, 420);
+    ctx.closePath(); ctx.fill();
+    const hx = watching ? 1219 : 1237;
+    const hy = watching ? 413 : 411;
+    ctx.fillStyle = '#f4f1e6';
+    ctx.beginPath(); ctx.arc(hx, hy, 4.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f2b33d';
+    ctx.beginPath();
+    if (watching) { ctx.moveTo(hx - 4, hy); ctx.lineTo(hx - 8.5, hy + 1.6); ctx.lineTo(hx - 4, hy + 3); }
+    else { ctx.moveTo(hx + 4, hy); ctx.lineTo(hx + 8.5, hy + 1.6); ctx.lineTo(hx + 4, hy + 3); }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#22382e';
+    ctx.beginPath(); ctx.arc(hx + (watching ? -1.5 : 1.5), hy - 0.8, 0.95, 0, Math.PI * 2); ctx.fill();
+  }
   // One large harbour window set into the front of the left counter, where two
   // small portholes used to be: a wood frame, sky over sea, one fishing boat
   // going about its business and gulls over the water. The whole drawing is
@@ -991,6 +1071,28 @@ function drawKitchen(ctx, state) {
   for (const [wx, wy] of [[196, 734], [226, 743], [286, 737], [306, 747]]) {
     ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + 11, wy); ctx.stroke();
   }
+  // Whitecaps answer the heat (AUDIT-V19 D7): the worse the rush inside,
+  // the rougher the water outside — up to four extra strokes, phased on
+  // the shift clock so the surface shimmers instead of sitting printed.
+  {
+    const caps = Math.floor(heat(state) * 4.99);
+    const spots = [[208, 739], [248, 750], [264, 731], [316, 743]];
+    for (let i = 0; i < caps; i++) {
+      const [wx, wy] = spots[i];
+      const drift = Math.sin(state.time * 0.9 + i * 1.9) * 1.6;
+      ctx.beginPath(); ctx.moveTo(wx + drift, wy); ctx.lineTo(wx + drift + 9, wy); ctx.stroke();
+    }
+  }
+  // A red buoy riding the water by the headland, bobbing on the clock.
+  {
+    const bobY = Math.sin(state.time * 1.4) * 1.1;
+    ctx.fillStyle = '#d8402a';
+    ctx.beginPath();
+    ctx.moveTo(297, 736 + bobY); ctx.lineTo(305, 736 + bobY); ctx.lineTo(303, 743 + bobY); ctx.lineTo(299, 743 + bobY);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff7e6';
+    ctx.fillRect(298.4, 738.6 + bobY, 5.2, 1.8);
+  }
   // The sun's glint in the top corner of the sky.
   ctx.fillStyle = 'rgba(255,240,190,0.85)';
   ctx.beginPath(); ctx.arc(302, 709, 6.5, 0, Math.PI * 2); ctx.fill();
@@ -1007,6 +1109,10 @@ function drawKitchen(ctx, state) {
   ctx.save();
   ctx.translate(219, 725);
   ctx.scale(1.3, 1.3);
+  // The boat rides its anchor: a slow bob on the shift clock, drawn inside
+  // the growth about its own centre so the held pivot never moves
+  // (AUDIT-V19 S5 — harbour life).
+  ctx.translate(0, Math.sin(state.time * 1.1) * 1.1);
   ctx.translate(-219, -725);
   ctx.fillStyle = '#274b52';
   ctx.beginPath();
@@ -1029,12 +1135,15 @@ function drawKitchen(ctx, state) {
   ctx.beginPath(); ctx.moveTo(204, 746.5); ctx.lineTo(218, 746.5); ctx.stroke();
   // Gulls: three small double-arcs over the water, and one smaller,
   // farther pair toward the sun — the sky has depth like the sea does.
+  // They sway on the shift clock now (AUDIT-V19 S5): a printed sky was
+  // the one dead surface left in the room.
   ctx.strokeStyle = '#33555e';
   ctx.lineWidth = 1.6;
   ctx.lineCap = 'round';
   for (const [gx, gy] of [[200, 709], [222, 704], [272, 707], [290, 718]]) {
-    ctx.beginPath(); ctx.arc(gx - 3.4, gy, 3.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
-    ctx.beginPath(); ctx.arc(gx + 3.4, gy, 3.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    const sway = Math.sin(state.time * 0.4 + gx * 0.05) * 2.5;
+    ctx.beginPath(); ctx.arc(gx + sway - 3.4, gy, 3.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.beginPath(); ctx.arc(gx + sway + 3.4, gy, 3.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
   }
   ctx.restore();
   ctx.restore();
@@ -1054,8 +1163,18 @@ function drawKitchen(ctx, state) {
   // Two whole lines: the board is 80 wide and cannot grow (plating ends at
   // 790, serve starts at 880), and "Harbour Plate $13" snapped in half at
   // that width — a fragment, a price line and a dish. The words give way.
-  text(ctx, 'Harbour $13', 836, 730, 10.5, '#fff7e6', 'center', false);
-  text(ctx, 'Prawn $14', 836, 747, 10.5, '#fff7e6', 'center', false);
+  // The first line is now TODAY'S CATCH (AUDIT-V19 S6): the shift's own
+  // featured dish, starred and chalked in the header's gold, with one
+  // staple line under it — the board belongs to the day being played.
+  {
+    const SHORT = { fillet: 'Fillet', salad: 'Salad', butty: 'Butty', harbour: 'Harbour', prawns: 'Prawn', fries: 'Chips' };
+    const dishOf = (id) => (id === 'fries' ? FRIES : DISHES[id]);
+    const special = dishOf(state.special);
+    const staple = state.special === 'prawns' ? DISHES.harbour : DISHES.prawns;
+    drawStar(ctx, 805, 701, 4.2, '#ffd968');
+    text(ctx, `${SHORT[state.special]} $${special.price}`, 836, 730, 10.5, '#ffd968', 'center', false);
+    text(ctx, `${SHORT[staple.id]} $${staple.price}`, 836, 747, 10.5, '#fff7e6', 'center', false);
+  }
   // Two fish crates stacked against the right counter by the serve window, the
   // morning's catch still in the top one.
   const crate = (x, y, w, h) => {
@@ -1072,6 +1191,10 @@ function drawKitchen(ctx, state) {
   };
   crate(1156, 596, 78, 54);
   crate(1166, 552, 58, 42);
+  // The crates are chalked with what they hold (AUDIT-V19 D11): FISH in
+  // the big one, ICE in the small — the harbour's shorthand, in chalk.
+  text(ctx, 'FISH', 1195, 630, 10, 'rgba(255,247,230,0.85)', 'center', false);
+  text(ctx, 'ICE', 1195, 579, 9, 'rgba(255,247,230,0.8)', 'center', false);
   ctx.fillStyle = '#d8402a';
   ctx.beginPath(); ctx.arc(1184, 550, 7.5, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
@@ -1080,6 +1203,13 @@ function drawKitchen(ctx, state) {
   ctx.beginPath(); ctx.arc(1200, 548, 8.5, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#a5dd8f';
   ctx.beginPath(); ctx.arc(1197, 545, 4, 0, Math.PI * 2); ctx.fill();
+
+  // The island's own shadow on the rug, cast before any counter is drawn:
+  // a heavy table stands ON the mat and shades it — the island used to sit
+  // flush on the rug with no shadow of its own, a board laid on a mat
+  // (AUDIT-V19 F1).
+  ctx.fillStyle = 'rgba(74,44,16,0.16)';
+  ctx.beginPath(); ctx.ellipse(640, 522, 222, 19, 0, 0, Math.PI * 2); ctx.fill();
 
   const active = nearestStation(state);
   for (const station of STATIONS) {
@@ -1107,8 +1237,31 @@ function drawKitchen(ctx, state) {
       // the difficulty audit measured that as a tax on every route — median
       // score $85.5 → $70 — so the block keeps its honest size and the
       // furnishing does the work instead. See work/v13/AUDIT-V13.md.)
+      // The table's body first (AUDIT-V19 F1, user-flagged: "so damn flat,
+      // it doesn't look like a table at all"): trestle legs and a crossbar
+      // below, a front face with real thickness under the top — all paint
+      // inside and below the existing footprint; the station rect and
+      // every solid are byte-identical, so no route in the room moved.
+      ctx.fillStyle = '#5d4830';
+      rr(ctx, station.x + 44, station.y + 104, 22, 26, 3); ctx.fill();
+      rr(ctx, station.x + 314, station.y + 104, 22, 26, 3); ctx.fill();
+      rr(ctx, station.x + 44, station.y + 120, 292, 7, 3); ctx.fill();
+      ctx.fillStyle = '#7d6240';
+      rr(ctx, station.x + 3, station.y + 78, station.w - 6, 34, 6); ctx.fill();
+      ctx.strokeStyle = 'rgba(60,44,26,0.5)';
+      ctx.lineWidth = 1.2;
+      for (const px of [station.x + 95, station.x + 190, station.x + 285]) {
+        ctx.beginPath(); ctx.moveTo(px, station.y + 82); ctx.lineTo(px, station.y + 108); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(60,44,26,0.35)';
+      ctx.fillRect(station.x + 7, station.y + 106, station.w - 14, 4);
       ctx.fillStyle = COLORS.driftwood;
       rr(ctx, station.x + 3, station.y + 3, station.w - 6, station.h - 6, 7); ctx.fill();
+      // The top slab's front rim catches the light: one bright line along
+      // its front edge is what separates a surface you could set a plate
+      // on from a sticker of wood.
+      ctx.fillStyle = 'rgba(255,240,200,0.5)';
+      ctx.fillRect(station.x + 7, station.y + 77, station.w - 14, 3);
       ctx.strokeStyle = 'rgba(95,79,60,0.55)';
       ctx.lineWidth = 1.2;
       for (const px of [station.x + 95, station.x + 190, station.x + 285]) {
@@ -1408,6 +1561,29 @@ function drawKitchen(ctx, state) {
           ctx.beginPath(); ctx.arc(px + ox, station.y + oy, 4.6, 0, Math.PI * 2); ctx.fill();
         }
       }
+      // The ticket spike at the counter's right end (AUDIT-V19 D1): every
+      // served ticket is filed on it, so the shift's output accumulates
+      // as paper — the count is state.served itself, capped at what the
+      // spike can hold.
+      {
+        ctx.strokeStyle = '#5d6a70';
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(700, 744); ctx.lineTo(700, 714); ctx.stroke();
+        ctx.fillStyle = '#3a3f42';
+        ctx.beginPath(); ctx.ellipse(700, 745, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
+        const slips = Math.min(state.served, 7);
+        for (let i = 0; i < slips; i++) {
+          ctx.save();
+          ctx.translate(700, 740 - i * 2.4);
+          ctx.rotate((i % 2 ? 1 : -1) * 0.09);
+          ctx.fillStyle = '#fdf6e3';
+          ctx.fillRect(-6.5, -4.5, 13, 9);
+          ctx.fillStyle = '#d84a2f';
+          ctx.beginPath(); ctx.arc(0, 0, 1.3, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }
+      }
       if (state.plate.length) {
         // A finished plate stacks up as a dish; one still being built spreads its
         // pieces out, with a dashed ring where the missing piece belongs. Both are
@@ -1444,7 +1620,11 @@ function drawKitchen(ctx, state) {
         ctx.ellipse(station.x + 8 + i * sw + sw / 2, station.y + 18, sw / 2, 6, 0, 0, Math.PI);
         ctx.fill();
       }
-      text(ctx, 'SERVE — dishes out here', cx, station.y + 30, 13, '#22382e');
+      // The label rides the counter's top edge now: the guests stand
+      // along the window's front (S1) exactly where the centred label
+      // used to sit, and its middle words went behind their heads —
+      // found on V19's own window crop and fixed in-round.
+      text(ctx, 'SERVE — dishes out here', station.x + station.w - 8, station.y - 6, 11, '#22382e', 'right');
       if (state.passDish) {
         // The pass moment, drawn at the plating counter's presence: a finished
         // plate big enough to find at contact-sheet size, with the game's own
@@ -1457,6 +1637,16 @@ function drawKitchen(ctx, state) {
         // into its label's first letter. Fries therefore sit smaller, on
         // the counter, clear of the label — the badge carries the call.
         const friesPass = state.passDish === 'fries';
+        // A combo's dish rests on a steel tray (AUDIT-V19 S4): a combo
+        // serve is a bigger event than a single's, and the pass says so.
+        if (state.passCombo) {
+          const tx = station.x + (friesPass ? 58 : 74);
+          const ty = station.y + (friesPass ? 62 : 56);
+          ctx.fillStyle = '#8d979d';
+          ctx.beginPath(); ctx.ellipse(tx, ty, friesPass ? 42 : 58, 12, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#c3ced3';
+          ctx.beginPath(); ctx.ellipse(tx, ty - 2, friesPass ? 38 : 53, 10, 0, 0, Math.PI * 2); ctx.fill();
+        }
         drawDish(ctx, state.passDish, station.x + (friesPass ? 58 : 74), station.y + (friesPass ? 57 : 46), friesPass ? 60 : 104);
         // Steam over the pass: the machines steam and the sheet's
         // "ready to serve" moment sat cold. Two wisps in the machines'
@@ -1464,23 +1654,70 @@ function drawKitchen(ctx, state) {
         // clock like theirs do. At the machines' own strength they
         // vanished over the serve counter's pale glass, though — the
         // pass wears a stronger literal of its own (AUDIT-V18 W4).
-        ctx.strokeStyle = 'rgba(255,255,255,0.72)';
-        ctx.lineWidth = 2.6;
-        ctx.lineCap = 'round';
-        for (const off of [-13, 13]) {
-          const sx = station.x + (friesPass ? 58 : 74) + off + Math.sin(state.time * 2.2 + off * 1.7) * 3;
-          const sy = station.y + (friesPass ? 30 : 26);
-          ctx.beginPath();
-          ctx.moveTo(sx, sy);
-          ctx.quadraticCurveTo(sx + 6, sy - 15, sx - 1, sy - 27);
-          ctx.stroke();
+        // Hot dishes only: a served salad used to steam too, and a cold
+        // dish drawn steaming lies about what it is (AUDIT-V19 F4).
+        if (state.passDish !== 'salad') {
+          ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+          ctx.lineWidth = 2.6;
+          ctx.lineCap = 'round';
+          for (const off of [-13, 13]) {
+            const sx = station.x + (friesPass ? 58 : 74) + off + Math.sin(state.time * 2.2 + off * 1.7) * 3;
+            const sy = station.y + (friesPass ? 30 : 26);
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.quadraticCurveTo(sx + 6, sy - 15, sx - 1, sy - 27);
+            ctx.stroke();
+          }
         }
-        drawBadge(ctx, station.x + 208, station.y + 50, 'READY TO SERVE!', '#1e7d46');
+        // Serve sparkles (AUDIT-V19 D6): for the serve's first moments,
+        // three small stars glint around the dish — the moment
+        // celebrates, briefly, then the room gets back to work.
+        if (state.passT > 1.15) {
+          const dx = station.x + (friesPass ? 58 : 74);
+          const dy = station.y + (friesPass ? 57 : 46);
+          drawStar(ctx, dx - 54, dy - 26, 4, '#ffe9a8');
+          drawStar(ctx, dx + 52, dy - 34, 3.4, '#ffe9a8');
+          drawStar(ctx, dx + 6, dy - 54, 3, '#ffe9a8');
+        }
+        // The badge hangs over the dish like a café sign now: the row
+        // below the counter belongs to the guests (AUDIT-V19 S1), and a
+        // pill at its old place would sit across their faces.
+        drawBadge(ctx, station.x + 74, station.y - 4, 'READY TO SERVE!', '#1e7d46');
       }
       // The service bell.
       ctx.fillStyle = COLORS.mustard;
       ctx.beginPath(); ctx.arc(station.x + station.w - 44, station.y + 48, 13, Math.PI, 0); ctx.fill();
       ctx.fillRect(station.x + station.w - 58, station.y + 48, 28, 4);
+      // The bell rings while a serve is fresh (AUDIT-V19 D9): two motion
+      // arcs, the room's punctuation for a dish gone out.
+      if (state.passT > 1.0) {
+        ctx.strokeStyle = 'rgba(201,150,53,0.75)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        for (const r of [18, 23]) {
+          ctx.beginPath(); ctx.arc(station.x + station.w - 44, station.y + 48, r, Math.PI * 1.15, Math.PI * 1.5); ctx.stroke();
+          ctx.beginPath(); ctx.arc(station.x + station.w - 44, station.y + 48, r, Math.PI * 1.5, Math.PI * 1.85); ctx.stroke();
+        }
+      }
+      // The tip jar at the window's right end (AUDIT-V19 D2): a small
+      // glass jar whose coin fill rises with the shift's earnings — the
+      // score as an object, readable without the HUD.
+      {
+        ctx.fillStyle = 'rgba(230,240,238,0.5)';
+        rr(ctx, 1226, 714, 20, 29, 4); ctx.fill();
+        ctx.strokeStyle = '#8d979d';
+        ctx.lineWidth = 1.4;
+        rr(ctx, 1226, 714, 20, 29, 4); ctx.stroke();
+        const coinH = Math.min(21, state.score * 0.18);
+        if (coinH > 1) {
+          ctx.fillStyle = '#c99635';
+          rr(ctx, 1229, 714 + 26 - coinH, 14, coinH, 2); ctx.fill();
+          ctx.fillStyle = '#e8c268';
+          ctx.beginPath(); ctx.ellipse(1236, 714 + 26 - coinH, 7, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = '#8d979d';
+        rr(ctx, 1224, 710, 24, 5, 2); ctx.fill();
+      }
     }
   }
   // A lamp rail over the island with two enamel pendants hanging from it.
@@ -1536,9 +1773,169 @@ function drawKitchen(ctx, state) {
     ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#c99635';
     ctx.fillRect(lx - 26, 328, 52, 4);
-    // The bulb itself.
-    ctx.fillStyle = '#ffd968';
+    // The bulb itself — its colour warms as the light falls (AUDIT-V19
+    // D10): pale in the morning, gold by midday, amber at dusk, the
+    // regime readable at the lamps themselves.
+    const warmth = heat(state);
+    ctx.fillStyle = warmth >= 0.66 ? '#ffb85c' : warmth >= 0.33 ? '#ffd968' : '#ffe9a8';
     ctx.beginPath(); ctx.arc(lx, 335, 5.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // At rush pitch the lamplight itself pulses (AUDIT-V19 S3): one more
+  // pool over the island, breathing on the clock, present only while the
+  // board is at rush — the room's third voice saying the same thing.
+  if (boardRush(state)) {
+    ctx.globalAlpha = 0.4 + Math.sin(state.time * 5) * 0.25;
+    ctx.fillStyle = 'rgba(255,205,120,0.10)';
+    ctx.beginPath(); ctx.ellipse(640, 460, 232, 80, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // A bunch of dried herbs hangs from the rail between the pendants
+  // (AUDIT-V19 D13), swaying on the clock — the middle band's air gains
+  // the kitchen's own dressing.
+  ctx.save();
+  ctx.translate(640, 256);
+  ctx.rotate(Math.sin(state.time * 0.8) * 0.04);
+  ctx.strokeStyle = '#8a6a24';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 12); ctx.stroke();
+  ctx.strokeStyle = '#579a44';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  for (const dx of [-7, -2.5, 2.5, 7]) {
+    ctx.beginPath(); ctx.moveTo(0, 12); ctx.lineTo(dx, 30 + Math.abs(dx) * 0.5); ctx.stroke();
+  }
+  ctx.fillStyle = '#63b34f';
+  for (const [ox, oy] of [[-7, 33], [-2.5, 35], [2.5, 35], [7, 33], [0, 38]]) {
+    ctx.beginPath(); ctx.ellipse(ox, oy, 3.4, 2.2, ox * 0.1, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+  // The guests at the window (AUDIT-V19 S1): one per ticket, in ticket
+  // order, drawn over the counter's face — they stand outside it.
+  drawGuests(ctx, state);
+  // The shift-light regime (AUDIT-V19 S2): one wash over the whole room,
+  // the last thing the kitchen draws. Early, a cool morning tone that
+  // thins as the shift warms; late, a warm dusk that deepens with the
+  // same heat the lamps answer. Title is morning, the cover midday
+  // warmth, the rush dusk, the end last light.
+  {
+    const h = heat(state);
+    const cool = (1 - h) * 0.05;
+    if (cool > 0.004) {
+      ctx.fillStyle = `rgba(140,190,205,${cool.toFixed(3)})`;
+      ctx.fillRect(0, BOARD_H, VIEW.width, VIEW.height - BOARD_H);
+    }
+    if (h > 0.02) {
+      ctx.fillStyle = `rgba(255,158,64,${(h * 0.13).toFixed(3)})`;
+      ctx.fillRect(0, BOARD_H, VIEW.width, VIEW.height - BOARD_H);
+    }
+  }
+}
+
+/**
+ * One guest, drawn standing at the window with their feet at (x, feetY):
+ * a harbour-town figure in the room's flat language — coat, neck, head,
+ * hair in one of four ways, and a face that is their ticket's timer.
+ * A guest whose combo line is already served holds that dish's plate.
+ */
+function drawGuestFigure(ctx, state, g, slideY, alpha) {
+  const x = g.x + (g.mood === 'cross' ? Math.sin(state.time * 9 + g.x) * 0.7 : 0);
+  const feetY = g.feetY + slideY;
+  ctx.save();
+  if (alpha < 1) ctx.globalAlpha = alpha;
+  // Legs and shoes.
+  ctx.fillStyle = '#3a3f42';
+  rr(ctx, x - 7.5, feetY - 14, 6.5, 12, 2); ctx.fill();
+  rr(ctx, x + 1, feetY - 14, 6.5, 12, 2); ctx.fill();
+  ctx.fillStyle = '#2b2320';
+  ctx.beginPath(); ctx.ellipse(x - 4.4, feetY - 1.6, 4.8, 2.1, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + 4.4, feetY - 1.6, 4.8, 2.1, 0, 0, Math.PI * 2); ctx.fill();
+  // The coat, with a shaded hem.
+  ctx.fillStyle = g.look.coat;
+  rr(ctx, x - 11, feetY - 41, 22, 28, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.13)';
+  rr(ctx, x - 11, feetY - 21, 22, 8, 4); ctx.fill();
+  // Arms: down at the sides, or up holding the collected line's dish.
+  if (g.holds) {
+    ctx.strokeStyle = g.look.coat;
+    ctx.lineWidth = 4.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x - 9, feetY - 36); ctx.lineTo(x - 6, feetY - 27); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 9, feetY - 36); ctx.lineTo(x + 6, feetY - 27); ctx.stroke();
+    drawDish(ctx, g.holds, x, feetY - 31, 27);
+  } else {
+    ctx.strokeStyle = g.look.coat;
+    ctx.lineWidth = 4.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x - 10, feetY - 37); ctx.lineTo(x - 12.5, feetY - 21); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 10, feetY - 37); ctx.lineTo(x + 12.5, feetY - 21); ctx.stroke();
+    ctx.fillStyle = g.look.skin;
+    ctx.beginPath(); ctx.arc(x - 12.5, feetY - 20, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 12.5, feetY - 20, 2.6, 0, Math.PI * 2); ctx.fill();
+  }
+  // Neck and head, with a cheek's shade.
+  ctx.fillStyle = g.look.skin;
+  ctx.fillRect(x - 3, feetY - 47, 6, 6);
+  ctx.beginPath(); ctx.arc(x, feetY - 53, 8.6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(160,90,40,0.20)';
+  ctx.beginPath(); ctx.arc(x + 4.6, feetY - 49.5, 3.1, 0, Math.PI * 2); ctx.fill();
+  // Hair, in the guest's own way.
+  ctx.fillStyle = g.look.hair;
+  if (g.look.style === 0) {
+    ctx.beginPath(); ctx.arc(x, feetY - 54, 8.6, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.fillRect(x - 9.4, feetY - 55.4, 18.8, 2.2);
+  } else if (g.look.style === 1) {
+    ctx.beginPath(); ctx.arc(x, feetY - 54, 8.6, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, feetY - 63.5, 3.4, 0, Math.PI * 2); ctx.fill();
+  } else if (g.look.style === 2) {
+    for (const ox of [-6, 0, 6]) {
+      ctx.beginPath(); ctx.arc(x + ox, feetY - 59.5, 3.3, 0, Math.PI * 2); ctx.fill();
+    }
+  } else {
+    ctx.strokeStyle = g.look.hair;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, feetY - 50.5, 7.4, Math.PI * 0.2, Math.PI * 0.8); ctx.stroke();
+  }
+  // The face: the ticket's own timer, in features. Content above half,
+  // flat to a quarter, cross below it — the board's 0.25 threshold.
+  ctx.fillStyle = '#22382e';
+  ctx.beginPath(); ctx.arc(x - 3.2, feetY - 53, 1.05, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 3.2, feetY - 53, 1.05, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#22382e';
+  ctx.lineWidth = 1.1;
+  ctx.lineCap = 'round';
+  if (g.mood === 'content') {
+    ctx.beginPath(); ctx.arc(x - 3.2, feetY - 55.4, 2.1, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + 3.2, feetY - 55.4, 2.1, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, feetY - 49.6, 2.6, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  } else if (g.mood === 'flat') {
+    ctx.beginPath(); ctx.moveTo(x - 5.2, feetY - 56.8); ctx.lineTo(x - 1.2, feetY - 56.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 1.2, feetY - 56.8); ctx.lineTo(x + 5.2, feetY - 56.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 2.4, feetY - 47.6); ctx.lineTo(x + 2.4, feetY - 47.6); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(x - 5.4, feetY - 57.6); ctx.lineTo(x - 1.2, feetY - 55.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 5.4, feetY - 57.6); ctx.lineTo(x + 1.2, feetY - 55.8); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, feetY - 44.9, 2.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * The window's crowd: the waiting guests in ticket order, then the ones
+ * leaving — served guests slide down off the window smiling with their
+ * dish held high; walked-out guests storm off cross. Departures were
+ * recorded by orders.js at the event itself and age on the popup clock.
+ */
+function drawGuests(ctx, state) {
+  state.tickets.forEach((ticket, i) => {
+    drawGuestFigure(ctx, state, guestFor(ticket, i), 0, 1);
+  });
+  for (const dep of state.departures) {
+    const p = Math.min(1, dep.t / 0.9);
+    drawGuestFigure(ctx, state, {
+      x: dep.x, feetY: 774, look: dep.look,
+      mood: dep.mood === 'happy' ? 'content' : 'cross',
+      holds: dep.mood === 'happy' ? dep.dish : null,
+    }, p * 30, 1 - p * 0.85);
   }
 }
 
@@ -1557,7 +1954,9 @@ export function chefStrained(state) {
 
 function drawChef(ctx, state) {
   const chef = state.chef;
-  const bob = Math.sin(chef.walk) * 2.4;
+  // The walk bob quickens in presence at rush pitch (AUDIT-V19 S7): the
+  // same steps, a larger stride — the cook hustles when the board does.
+  const bob = Math.sin(chef.walk) * (boardRush(state) ? 3.4 : 2.4);
   // Drawn a step larger than his collision circle: the room is big and the
   // cook is its only character — at his old size he read as a token on the
   // floor instead of the person working it. The scale pivots on his feet,
@@ -1569,11 +1968,28 @@ function drawChef(ctx, state) {
   ctx.translate(chef.x, chef.y + 27);
   ctx.scale(1.25, 1.25);
   ctx.translate(-chef.x, -(chef.y + 27));
+  // The lean (AUDIT-V19 S7): mid-chop at a board, the cook leans into
+  // the work — a tilt about his feet toward the board, present only
+  // while the knife is actually part-way through something.
+  {
+    const near = nearestStation(state);
+    if (near && near.kind === 'board') {
+      const board = state.boards.find((b) => b.station === near);
+      const need = board && board.item ? { tomato: 3, lettuce: 2, potato: 3 }[board.item] : 0;
+      if (board && need && board.chops > 0 && board.chops < need) {
+        ctx.translate(chef.x, chef.y + 27);
+        ctx.rotate(0.055 * chef.face);
+        ctx.translate(-chef.x, -(chef.y + 27));
+      }
+    }
+  }
   // The cook's face answers the pressure on the board: brows down, mouth
   // flat, sweat flying — whenever a ticket is dying or the board is full.
   const strained = chefStrained(state);
   const x = chef.x;
-  const y = chef.y + bob * 0.3;
+  // Off shift (title, shutters down) he breathes: a slow sway on the
+  // room's clock instead of the walk bob (AUDIT-V19 S7).
+  const y = chef.y + bob * 0.3 + (state.phase === 'play' ? 0 : Math.sin(state.time * 2) * 0.5);
   // A soft contact shadow in two layers — a wide faint ellipse under a
   // tighter darker one — so he sits in the room's light instead of on
   // one hard-edged sticker.
@@ -1581,79 +1997,161 @@ function drawChef(ctx, state) {
   ctx.beginPath(); ctx.ellipse(x, chef.y + 27, 31, 9.5, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = 'rgba(0,0,0,0.15)';
   ctx.beginPath(); ctx.ellipse(x, chef.y + 27, 23, 6.8, 0, 0, Math.PI * 2); ctx.fill();
-  // Arms in indigo sleeves, ending in hands: both up under whatever he
-  // carries — the hands visibly hold it — or resting at his sides. The
-  // old bare skin strokes vanished against the floor at judge size,
-  // and a carried dish floated over the toque, held by nothing.
-  // A dish rides at tray height, hands under its rim; an ingredient
-  // has no plate under it, so it rides higher — at the old shared
-  // anchor an ingredient's lowest pieces lay inside the toque dome's
-  // span and read as worn on the hat (tomato slices as red discs,
-  // AUDIT-V18 W1) — and the arms and hands rise to meet the ride.
+  // THE PERSON (AUDIT-V19 F2, user-flagged: "he doesn't look like a
+  // human, that's a doll"). The figure is redrawn as a little person in
+  // the same flat house style: legs and shoes below, a torso that
+  // tapers from sloped shoulders to a waist, two-segment arms with an
+  // elbow bend and real hands, a neck, and a head with a jaw. What does
+  // NOT move: the feet pivot above, the 1.25 scale, the carry anchors
+  // (dish −62, ingredient −74) and the hands' rise to meet them — a
+  // dish still rides at tray height with hands under its rim, and an
+  // ingredient still rides clear of the toque (AUDIT-V18 W1).
   const carryDish = !!chef.carry && !!DISHES[chef.carry];
-  const armY = carryDish ? -44 : -60;
   const handY = carryDish ? -46 : -62;
-  ctx.lineCap = 'round';
-  for (const side of [-1, 1]) {
-    ctx.strokeStyle = '#2c4a7c';
-    ctx.lineWidth = 8.5;
-    ctx.beginPath();
-    if (chef.carry) {
-      ctx.moveTo(x + side * 20, y + 8);
-      ctx.lineTo(x + side * 11, y + armY);
-    } else {
-      ctx.moveTo(x + side * 23, y + 2);
-      ctx.lineTo(x + side * 27, y + 15);
-    }
-    ctx.stroke();
-    ctx.fillStyle = '#f0bd8f';
-    ctx.beginPath();
-    ctx.arc(x + side * (chef.carry ? 11 : 27), y + (chef.carry ? handY : 17), 3.7, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // Apron body — harbour indigo, a cream apron front with a pocket.
+  // Legs, swinging against each other as he walks, and shoes that
+  // point the way he faces.
+  const swing = Math.sin(chef.walk) * 3;
+  ctx.fillStyle = '#37414a';
+  rr(ctx, x - 11 + swing, y + 12, 8.5, 13, 3); ctx.fill();
+  rr(ctx, x + 2.5 - swing, y + 12, 8.5, 13, 3); ctx.fill();
+  ctx.fillStyle = '#2b2320';
+  ctx.beginPath(); ctx.ellipse(x - 6.8 + swing + chef.face * 1.5, y + 26, 6.2, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + 6.8 - swing + chef.face * 1.5, y + 26, 6.2, 3, 0, 0, Math.PI * 2); ctx.fill();
+  // The torso: an indigo jacket from sloped shoulders tapering to the
+  // waist — a path, not a circle; the bell is gone.
   ctx.fillStyle = '#2c4a7c';
-  ctx.beginPath(); ctx.arc(x, y + 6, 25, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x - 6.5, y - 13);
+  ctx.quadraticCurveTo(x - 15, y - 10.5, x - 16.5, y - 4);
+  ctx.lineTo(x - 12.5, y + 13);
+  ctx.quadraticCurveTo(x, y + 16.5, x + 12.5, y + 13);
+  ctx.lineTo(x + 16.5, y - 4);
+  ctx.quadraticCurveTo(x + 15, y - 10.5, x + 6.5, y - 13);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.16)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(x, y - 11); ctx.lineTo(x, y - 3); ctx.stroke();
+  // The apron over the jacket: a bib, a waistband, a skirt, the
+  // stitched pocket — the V17 furniture, fitted to a waist now.
   ctx.fillStyle = '#f7f2e6';
-  rr(ctx, x - 13.5, y - 1 + bob * 0.2, 27, 23, 6); ctx.fill();
-  // The apron's neck strap, rising from its top corners to the neck —
-  // a plain cream block became an apron when it gained its furniture.
+  rr(ctx, x - 10.5, y - 3, 21, 10, 3); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x - 12, y + 6); ctx.lineTo(x + 12, y + 6);
+  ctx.lineTo(x + 13, y + 17.5); ctx.lineTo(x - 13, y + 17.5);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e8dfc9';
+  ctx.fillRect(x - 12.5, y + 5, 25, 3);
   ctx.strokeStyle = '#e8dfc9';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(x - 11, y - 0.5 + bob * 0.2);
-  ctx.lineTo(x - 4.5, y - 7.5 + bob * 0.2);
-  ctx.moveTo(x + 11, y - 0.5 + bob * 0.2);
-  ctx.lineTo(x + 4.5, y - 7.5 + bob * 0.2);
+  ctx.moveTo(x - 9, y - 2.5); ctx.lineTo(x - 4, y - 9.5);
+  ctx.moveTo(x + 9, y - 2.5); ctx.lineTo(x + 4, y - 9.5);
   ctx.stroke();
-  // The pocket, stitched: a dashed top line is what makes it a pocket.
   ctx.strokeStyle = '#d8cfb8';
   ctx.lineWidth = 1.4;
-  rr(ctx, x + 2, y + 10 + bob * 0.2, 9, 8, 2); ctx.stroke();
+  rr(ctx, x + 2, y + 10, 9, 8, 2); ctx.stroke();
   ctx.strokeStyle = '#b8ab8d';
   ctx.setLineDash([2.2, 1.8]);
   ctx.beginPath();
-  ctx.moveTo(x + 2.8, y + 12.4 + bob * 0.2);
-  ctx.lineTo(x + 10.2, y + 12.4 + bob * 0.2);
+  ctx.moveTo(x + 2.8, y + 12.4); ctx.lineTo(x + 10.2, y + 12.4);
   ctx.stroke();
   ctx.setLineDash([]);
-  // A towel hangs at his left side, striped in the room's teal.
+  // A towel hangs at his left side, striped in the room's teal — at
+  // the waistband's end, where a cook's towel hangs.
   ctx.fillStyle = '#f7f2e6';
-  rr(ctx, x - 24.5, y + 9 + bob * 0.2, 8.5, 14, 2); ctx.fill();
+  rr(ctx, x - 24.5, y + 9, 8.5, 14, 2); ctx.fill();
   ctx.fillStyle = COLORS.teal;
-  ctx.fillRect(x - 24.5, y + 13.5 + bob * 0.2, 8.5, 2.2);
-  ctx.fillRect(x - 24.5, y + 18.5 + bob * 0.2, 8.5, 2.2);
-  // Head and face.
+  ctx.fillRect(x - 24.5, y + 13.5, 8.5, 2.2);
+  ctx.fillRect(x - 24.5, y + 18.5, 8.5, 2.2);
+  // Arms in two segments — upper arm and forearm with an elbow between
+  // — in indigo sleeves, ending in hands: a palm with fingers. Carrying,
+  // both rise to the carry anchors; resting, they hang at his sides.
+  ctx.lineCap = 'round';
+  for (const side of [-1, 1]) {
+    ctx.strokeStyle = '#2c4a7c';
+    if (chef.carry) {
+      const elbowY = y + handY * 0.55;
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(x + side * 14.5, y - 4);
+      ctx.lineTo(x + side * 19.5, elbowY);
+      ctx.stroke();
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(x + side * 19.5, elbowY);
+      ctx.lineTo(x + side * 11, y + handY);
+      ctx.stroke();
+    } else {
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(x + side * 14.5, y - 4);
+      ctx.lineTo(x + side * 18.5, y + 7);
+      ctx.stroke();
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(x + side * 18.5, y + 7);
+      ctx.lineTo(x + side * 17.5, y + 16);
+      ctx.stroke();
+    }
+    // The hand: a palm, and fingers that grip when carrying.
+    const hx = x + side * (chef.carry ? 11 : 17.5);
+    const hy = y + (chef.carry ? handY : 17);
+    ctx.fillStyle = '#f0bd8f';
+    ctx.beginPath(); ctx.arc(hx, hy, 3.7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#f0bd8f';
+    ctx.lineWidth = 1.6;
+    if (chef.carry) {
+      ctx.beginPath(); ctx.moveTo(hx - 2, hy - 2); ctx.lineTo(hx - 2.6, hy - 6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(hx + 2, hy - 2); ctx.lineTo(hx + 2.6, hy - 6); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(hx - 1.8, hy + 2); ctx.lineTo(hx - 2.2, hy + 5.5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(hx + 1.8, hy + 2); ctx.lineTo(hx + 2.2, hy + 5.5); ctx.stroke();
+    }
+  }
+  // Head and face — a person's, now: ears, hair at the toque's edge, a
+  // jaw, a shaded cheek and a nose with dimension (AUDIT-V19 F2).
+  // The neck, with the shadow the jaw throws on it.
   ctx.fillStyle = '#f0bd8f';
-  ctx.beginPath(); ctx.arc(x, y - 21 + bob * 0.2, 15.5, 0, Math.PI * 2); ctx.fill();
+  rr(ctx, x - 4.5, y - 15, 9, 7, 2); ctx.fill();
+  ctx.fillStyle = 'rgba(160,90,40,0.25)';
+  ctx.fillRect(x - 4.5, y - 10, 9, 2.2);
+  // Hair first, a rim behind the head: it shows at the sides, under the
+  // toque's band — the doll's bald join between hat and face is gone.
+  ctx.fillStyle = '#4a3220';
+  ctx.beginPath(); ctx.arc(x, y - 24.5, 13.6, 0, Math.PI * 2); ctx.fill();
+  // Ears, with their inner shade.
+  ctx.fillStyle = '#f0bd8f';
+  for (const side of [-1, 1]) {
+    ctx.beginPath(); ctx.arc(x + side * 12.8, y - 22, 3.1, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(160,90,40,0.3)';
+  for (const side of [-1, 1]) {
+    ctx.beginPath(); ctx.arc(x + side * 12.8, y - 22, 1.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // The head itself: a cranium with a jaw under it — the union reads as
+  // a skull with a chin, not a ball on a bell.
+  ctx.fillStyle = '#f0bd8f';
+  ctx.beginPath(); ctx.arc(x, y - 24, 13, 0, Math.PI * 2); ctx.fill();
+  rr(ctx, x - 9.5, y - 22, 19, 12.5, 5); ctx.fill();
+  // Sideburns where the hair meets the cheeks.
+  ctx.fillStyle = '#4a3220';
+  for (const side of [-1, 1]) ctx.fillRect(x + side * 12.1 - 1.3, y - 28, 2.6, 6);
+  // Eyes.
   ctx.fillStyle = '#2b2320';
   for (const side of [-1, 1]) {
-    ctx.beginPath(); ctx.arc(x + side * 5.6, y - 22 + bob * 0.2, 1.7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + side * 5.2, y - 23.5, 1.6, 0, Math.PI * 2); ctx.fill();
   }
-  // A small nose: two dots and an arc were a symbol for a face; the
-  // character the sheet's feel rests on gets a face of his own.
-  ctx.fillStyle = '#d99a63';
-  ctx.beginPath(); ctx.arc(x, y - 19.6 + bob * 0.2, 1.5, 0, Math.PI * 2); ctx.fill();
+  // The nose, with dimension: a shaded wedge turned the way he faces,
+  // where a single dot used to stand for one.
+  ctx.fillStyle = 'rgba(217,154,99,0.9)';
+  ctx.beginPath();
+  ctx.moveTo(x + chef.face * 0.5 - 0.6, y - 22.6);
+  ctx.lineTo(x + chef.face * 0.5 + 2.4, y - 18.6);
+  ctx.lineTo(x + chef.face * 0.5 - 2, y - 18.6);
+  ctx.closePath(); ctx.fill();
+  // A cheekbone's shade on one side — skin is shaded now, not flat.
+  ctx.fillStyle = 'rgba(217,154,99,0.4)';
+  ctx.beginPath(); ctx.arc(x - 8.6, y - 18.6, 3, 0, Math.PI * 2); ctx.fill();
   if (strained) {
     // Determined brows, angled down toward the nose.
     ctx.strokeStyle = '#7a4a26';
@@ -1661,16 +2159,16 @@ function drawChef(ctx, state) {
     ctx.lineCap = 'round';
     for (const side of [-1, 1]) {
       ctx.beginPath();
-      ctx.moveTo(x + side * 10.2, y - 29.5 + bob * 0.2);
-      ctx.lineTo(x + side * 3.4, y - 26.8 + bob * 0.2);
+      ctx.moveTo(x + side * 9.8, y - 30.2);
+      ctx.lineTo(x + side * 3.2, y - 27.6);
       ctx.stroke();
     }
     // A flat, set mouth instead of the smile.
     ctx.strokeStyle = '#a96a3f';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(x - 4.6, y - 15.6 + bob * 0.2);
-    ctx.lineTo(x + 4.6, y - 16.4 + bob * 0.2);
+    ctx.moveTo(x - 4.4, y - 15.2);
+    ctx.lineTo(x + 4.4, y - 16);
     ctx.stroke();
     // Sweat, flung off both sides of the head and beading at the temple.
     const drop = (dx, dy, s, rot) => {
@@ -1704,23 +2202,27 @@ function drawChef(ctx, state) {
     ctx.lineCap = 'round';
     for (const side of [-1, 1]) {
       ctx.beginPath();
-      ctx.arc(x + side * 5.6, y - 25.6 + bob * 0.2, 3.4, Math.PI * 1.15, Math.PI * 1.85);
+      ctx.arc(x + side * 5.2, y - 26.6, 3.2, Math.PI * 1.15, Math.PI * 1.85);
       ctx.stroke();
     }
     ctx.strokeStyle = '#a96a3f';
     ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(x, y - 17.5 + bob * 0.2, 5.6, 0.25, Math.PI - 0.25); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y - 17.8, 5.2, 0.25, Math.PI - 0.25); ctx.stroke();
   }
+  // The chin line: one quiet curve under the mouth, the jaw's finish.
+  ctx.strokeStyle = 'rgba(160,90,40,0.35)';
+  ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.arc(x, y - 13.8, 3.8, Math.PI * 0.2, Math.PI * 0.8); ctx.stroke();
   ctx.fillStyle = 'rgba(216,74,47,0.32)';
   for (const side of [-1, 1]) {
-    ctx.beginPath(); ctx.arc(x + side * 10.5, y - 17 + bob * 0.2, 2.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + side * 9.6, y - 17.6, 2.6, 0, Math.PI * 2); ctx.fill();
   }
   // A tall toque: band, dome and two side puffs.
   ctx.fillStyle = '#ffffff';
-  rr(ctx, x - 14.5, y - 40 + bob * 0.2, 29, 8.5, 4); ctx.fill();
-  ctx.beginPath(); ctx.arc(x, y - 41 + bob * 0.2, 11.5, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x - 8, y - 39 + bob * 0.2, 7.5, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + 8, y - 39 + bob * 0.2, 7.5, 0, Math.PI * 2); ctx.fill();
+  rr(ctx, x - 13.5, y - 39, 27, 8, 3.5); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y - 40, 10.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x - 7.5, y - 38, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 7.5, y - 38, 7, 0, Math.PI * 2); ctx.fill();
   // The toque's cloth: two fold curves down the dome and stitch ticks
   // on the band. Flat white shapes read as a blob at judge size — and
   // the tomato he carries overhead used to read as dots on the hat.
@@ -1729,16 +2231,16 @@ function drawChef(ctx, state) {
   ctx.lineCap = 'round';
   for (const fx of [-5.5, 5.5]) {
     ctx.beginPath();
-    ctx.moveTo(x + fx, y - 49.5 + bob * 0.2);
-    ctx.quadraticCurveTo(x + fx * 1.25, y - 44 + bob * 0.2, x + fx, y - 39.5 + bob * 0.2);
+    ctx.moveTo(x + fx, y - 47.5);
+    ctx.quadraticCurveTo(x + fx * 1.25, y - 42.5, x + fx, y - 38);
     ctx.stroke();
   }
   ctx.strokeStyle = 'rgba(141,151,157,0.7)';
   ctx.lineWidth = 1.1;
-  for (const sx of [-9, -3, 3, 9]) {
+  for (const sx of [-8.5, -2.8, 2.8, 8.5]) {
     ctx.beginPath();
-    ctx.moveTo(x + sx, y - 38.6 + bob * 0.2);
-    ctx.lineTo(x + sx, y - 34.6 + bob * 0.2);
+    ctx.moveTo(x + sx, y - 37.2);
+    ctx.lineTo(x + sx, y - 33.8);
     ctx.stroke();
   }
   // Neckerchief, knotted on the facing side: a wider fall of cloth and
@@ -1769,7 +2271,24 @@ function drawBoard(ctx, state) {
   ctx.fillRect(0, 0, VIEW.width, BOARD_H);
   ctx.fillStyle = COLORS.boardEdge;
   ctx.fillRect(0, BOARD_H - 5, VIEW.width, 5);
-  text(ctx, 'ORDERS', 52, 16, 13, COLORS.mustard, 'left');
+  // At rush pitch the board itself says so (AUDIT-V19 S3): the label is
+  // the first thing the eye finds, and it turns to the rush's own voice.
+  text(ctx, boardRush(state) ? 'ORDERS — RUSH!' : 'ORDERS', 52, 16, 13, boardRush(state) ? '#ff8a75' : COLORS.mustard, 'left');
+  // The order pencil, hanging on its string from the board's bottom
+  // edge (AUDIT-V19 D12) — the board's tool, where a cook keeps it.
+  ctx.strokeStyle = 'rgba(255,247,230,0.5)';
+  ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.moveTo(20, 118); ctx.lineTo(20, 129); ctx.stroke();
+  ctx.save();
+  ctx.translate(20, 137);
+  ctx.rotate(0.12);
+  ctx.fillStyle = '#f2b33d';
+  ctx.fillRect(-2.5, -7, 5, 11);
+  ctx.fillStyle = '#f7e0b0';
+  ctx.beginPath(); ctx.moveTo(-2.5, 4); ctx.lineTo(2.5, 4); ctx.lineTo(0, 8.5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2b2320';
+  ctx.beginPath(); ctx.arc(0, 8, 0.9, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
   const cardW = 214;
   const gap = 8;
   state.tickets.forEach((ticket, i) => {
@@ -1874,12 +2393,22 @@ function drawBoard(ctx, state) {
     if (frac < 0.25) {
       // Last of all on the card: a filled alarm disc on its top corner with a
       // white bang — the one mark on the board nobody can miss at a glance.
+      // The disc breathes now (AUDIT-V19 D5): a dying ticket pulses on
+      // the room's clock, the still frame's one moving alarm.
+      const alarmR = 11 + Math.sin(state.time * 6) * 1.1;
       ctx.fillStyle = COLORS.red;
-      ctx.beginPath(); ctx.arc(x + cardW - 3, y + 3, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + cardW - 3, y + 3, alarmR, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x + cardW - 3, y + 3, 11, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x + cardW - 3, y + 3, alarmR, 0, Math.PI * 2); ctx.stroke();
       text(ctx, '!', x + cardW - 3, y + 4, 15, '#ffffff');
+    }
+    // The NEXT tag (AUDIT-V19 D8): when a queue waits, the oldest card
+    // wears the route's start on its bottom edge.
+    if (i === 0 && state.tickets.length > 1) {
+      ctx.fillStyle = COLORS.mustard;
+      rr(ctx, x + 10, y + h - 5, 42, 13, 4); ctx.fill();
+      text(ctx, 'NEXT', x + 31, y + h + 1.5, 9, '#22382e');
     }
   });
   if (state.tickets.length === 0 && state.phase === 'play') {
@@ -1961,6 +2490,9 @@ function drawOverlays(ctx, state) {
     };
     [...RECIPES, FRIES].forEach((dish, i) => {
       const y = 288 + i * 40;
+      // Today's catch wears a drawn star before its icon (AUDIT-V19
+      // S6): the same mark the kitchen's specials board carries.
+      if (dish.id === state.special) drawStar(ctx, 272, y - 4, 6, '#ffd968');
       // Fries at 26, one step below the 30 they stepped to last round:
       // the carton spans ~52 units tall, so even at 30 it stood ~35 px
       // against a plate icon's ~25 — still the tallest mark in its row.

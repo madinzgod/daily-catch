@@ -4,6 +4,7 @@
 import { WALKOUT_FINE, stationById } from './config.js';
 import { DISHES, makeTicket } from './recipes.js';
 import { addPopup, heat } from './kitchen.js';
+import { departureFor } from './guests.js';
 
 /** How many tickets the board can hold right now — the rush builds as the shift goes on. */
 export function ticketCap(state) {
@@ -29,9 +30,23 @@ export function updateTickets(state, dt) {
   for (const ticket of gone) {
     state.walkouts += 1;
     state.score -= WALKOUT_FINE;
+    // The guest who owned the ticket storms off from where they stood.
+    state.departures.push(departureFor(ticket, state.tickets.indexOf(ticket), 'angry', null));
     addPopup(state, serve.x + serve.w / 2, serve.y - 26, `-$${WALKOUT_FINE} WALKOUT`, '#d84a2f');
   }
   if (gone.length) state.tickets = state.tickets.filter((t) => t.timeLeft > 0);
+}
+
+/**
+ * Whether the board is at rush pitch: full, or with two tickets dying at
+ * once. The strain rule's family — the same red-zone threshold (frac <
+ * 0.25) the cards and the cook's face use — so the room's voices can
+ * never disagree about how bad it is.
+ */
+export function boardRush(state) {
+  if (state.phase !== 'play') return false;
+  return state.tickets.length >= 5
+    || state.tickets.filter((t) => t.timeLeft / t.timeTotal < 0.25).length >= 2;
 }
 
 /**
@@ -45,11 +60,16 @@ export function serveDish(state, dishId) {
     if (!line) continue;
     line.done = true;
     state.servedBy[dishId] = (state.servedBy[dishId] || 0) + 1;
+    // A combo's serve is a bigger event than a single's, and the pass
+    // remembers which kind is resting on it.
+    state.passCombo = ticket.items.length > 1;
     if (ticket.items.every((i) => i.done)) {
       const tip = Math.round(ticket.price * 0.5 * (ticket.timeLeft / ticket.timeTotal));
       state.score += ticket.price + tip;
       state.served += 1;
       state.bestTip = Math.max(state.bestTip, tip);
+      // The guest collects their dish and leaves happy from their slot.
+      state.departures.push(departureFor(ticket, state.tickets.indexOf(ticket), 'happy', dishId));
       state.tickets = state.tickets.filter((t) => t !== ticket);
       const serve = stationById('serve');
       addPopup(state, serve.x + serve.w / 2, serve.y - 30, `+$${ticket.price + tip}${tip >= 6 ? ' TOP TIP!' : ''}`, '#1f7a6d');

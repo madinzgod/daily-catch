@@ -18,6 +18,25 @@ const ctx = canvas.getContext('2d');
 canvas.width = VIEW.width;
 canvas.height = VIEW.height;
 
+// The page's live region (index.html's #status) speaks the game's state
+// to a screen reader: the phase and the current prompt, written only
+// when they change. It shipped empty and was never written to — a live
+// region that never speaks is worse than none (AUDIT-V19 F9).
+const statusEl = document.getElementById('status');
+let lastStatus = '';
+function announce(state) {
+  if (!statusEl) return;
+  const msg = state.phase === 'title'
+    ? 'The Daily Catch. Press Enter to start a shift.'
+    : state.phase === 'over'
+      ? `Shift over. You took $${state.score}. Press R for another shift.`
+      : (state.promptText || 'Working the kitchen.');
+  if (msg !== lastStatus) {
+    lastStatus = msg;
+    statusEl.textContent = msg;
+  }
+}
+
 const params = new URLSearchParams(location.search);
 const shotName = params.get('shot');
 const seedParam = Number(params.get('seed'));
@@ -93,6 +112,7 @@ if (shotName) {
       state.promptText = promptFor(state);
     }
     clearPressed();
+    announce(state);
     draw(ctx, state);
     requestAnimationFrame(frame);
   }

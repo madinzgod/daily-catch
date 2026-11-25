@@ -60,7 +60,7 @@ export const STATIONS = [
   { id: 'bin-patty', kind: 'bin', item: 'fillet_raw', label: 'FILLET', x: 200, y: 146, w: 150, h: 70 },
   { id: 'bin-tomato', kind: 'bin', item: 'tomato', label: 'TOMATO', x: 364, y: 146, w: 150, h: 70 },
   { id: 'bin-lettuce', kind: 'bin', item: 'lettuce', label: 'LETTUCE', x: 528, y: 146, w: 150, h: 70 },
-  { id: 'bin-cheese', kind: 'bin', item: 'prawns_raw', label: 'PRAWNS', x: 692, y: 146, w: 150, h: 70 },
+  { id: 'bin-prawns', kind: 'bin', item: 'prawns_raw', label: 'PRAWNS', x: 692, y: 146, w: 150, h: 70 },
   { id: 'bin-potato', kind: 'bin', item: 'potato', label: 'POTATO', x: 856, y: 146, w: 150, h: 70 },
   { id: 'grill', kind: 'grill', label: 'GRILL', x: 1022, y: 140, w: 222, h: 80 },
   { id: 'board-1', kind: 'board', label: 'CHOP', x: 30, y: 282, w: 150, h: 108 },

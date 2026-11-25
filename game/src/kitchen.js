@@ -3,10 +3,12 @@
 
 import { CHEF, SHIFT_SECONDS, stationById } from './config.js';
 import { makeRng } from './random.js';
+import { dailySpecial } from './recipes.js';
 
 export function createGame(seed) {
   return {
     rng: makeRng(seed),
+    special: dailySpecial(seed), // today's catch, featured on the boards
     phase: 'title', // title -> play -> over
     time: 0,
     shiftLeft: SHIFT_SECONDS,
@@ -27,6 +29,8 @@ export function createGame(seed) {
     plate: [], // ingredient ids stacked on the plating counter's plate
     passDish: null, // a served dish resting on the pass, briefly
     passT: 0,
+    passCombo: false, // the pass dish came from a combo ticket — it rests on a tray
+    departures: [], // guests leaving the window: {x, look, mood, dish, t}
     tickets: [],
     nextTicketId: 1,
     spawnT: 0,

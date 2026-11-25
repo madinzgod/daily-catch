@@ -38,6 +38,13 @@ seconds run out the shutters come down and the game tells the shift's story —
 what you took, what you served dish by dish, how much work the stations did, and
 a kitchen grade for the run.
 
+Every ticket has a guest. They wait at the serve window in ticket order, and
+their faces are their timers — content while there is time, cross when the bar
+runs red. Serve them and they leave smiling with the dish; let them walk and
+they storm off. The room keeps the same hours they do: the light warms toward
+dusk as the shift runs down, each day has its own featured catch chalked on the
+specials board, and a finished combo leaves on a steel tray.
+
 ## The menu
 
 | Dish | Price | Built from |
@@ -71,7 +78,8 @@ shot scenes: serve the game and open `?shot=cover`, `?shot=title`, `?shot=rush` 
 - `vendor/makefun-game.ts` — the make.fun dossier library, vendored unchanged
 - `game/index.html` + `game/src/` — the game, one job per file:
   `config.js` (the room and the clock), `recipes.js` (the menu), `kitchen.js`
-  (the state), `orders.js` (tickets and tips), `actions.js` (hands and the update),
+  (the state), `orders.js` (tickets and tips), `guests.js` (who waits at the
+  window), `actions.js` (hands and the update),
   `input.js`, `sound.js` (synthesized, no audio files), `render.js` (every pixel),
   `shots.js` (the screenshot scenes), `main.js` (boot and the frame loop)
 

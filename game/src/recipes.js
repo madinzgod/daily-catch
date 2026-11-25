@@ -56,6 +56,20 @@ export function isDish(id) {
   return Object.prototype.hasOwnProperty.call(DISHES, id);
 }
 
+/**
+ * The shift's featured dish — today's catch. Derived from the shift's seed
+ * by its own hash, never from the ticket RNG: the stream of tickets a seed
+ * deals must stay exactly the stream it always was, or every measured
+ * number in the difficulty audit moves. Same seed, same special, all shift.
+ */
+export function dailySpecial(seed) {
+  const ids = [...RECIPES.map((r) => r.id), FRIES.id];
+  let h = (seed >>> 0) || 1;
+  h = (h * 2654435761) >>> 0;
+  h ^= h >>> 13;
+  return ids[(h >>> 0) % ids.length];
+}
+
 /** The recipe whose pieces are exactly the multiset on the plate, or null. */
 export function recipeForStack(stack) {
   for (const recipe of RECIPES) {

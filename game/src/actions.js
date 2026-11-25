@@ -245,8 +245,14 @@ export function update(state, dt, input) {
   }
   if (state.passT > 0) {
     state.passT -= dt;
-    if (state.passT <= 0) state.passDish = null;
+    if (state.passT <= 0) {
+      state.passDish = null;
+      state.passCombo = false;
+    }
   }
+  // Departing guests walk off on the same clock the popups rise on.
+  for (const guest of state.departures) guest.t += dt;
+  state.departures = state.departures.filter((g) => g.t < 0.9);
   if (state.shakeT > 0) state.shakeT -= dt;
   if (state.hintT > 0) state.hintT -= dt;
 

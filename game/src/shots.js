@@ -126,6 +126,10 @@ function rush() {
   // rule cannot have happened, since serving that salad ticks its ticket.
   s.passDish = 'fries';
   s.passT = 1.2;
+  // The rush's pass fries came off a combo ticket (the butty + chips
+  // heading the board, its chips line ticked): the pass remembers, and
+  // the dish rests on the combo's steel tray (AUDIT-V19 S4).
+  s.passCombo = true;
   s.chef.x = 1006;
   s.chef.y = 636;
   s.chef.carry = 'prawns'; // carrying the answer to ticket #9
