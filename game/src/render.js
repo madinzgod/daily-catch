@@ -982,8 +982,14 @@ function drawKitchen(ctx, state) {
       }
       text(ctx, 'SERVE — dishes out here', cx, station.y + 30, 13, '#22382e');
       if (state.passDish) {
-        drawDish(ctx, state.passDish, station.x + 74, station.y + 50, 74);
-        text(ctx, 'READY TO SERVE', station.x + 74, station.y + 70, 10, COLORS.tealDark);
+        // The pass moment, drawn at the plating counter's presence: a finished
+        // plate big enough to find at contact-sheet size, with the game's own
+        // call on a pill beside it. A plate ready to serve is one of the six
+        // things the cover must show; at 74 units with a 10 px caption it
+        // read as a smudge at the frame's edge, so now it gets the same
+        // badge language as READY! / BURNT! / CUT!.
+        drawDish(ctx, state.passDish, station.x + 74, station.y + 46, 104);
+        drawBadge(ctx, station.x + 208, station.y + 50, 'READY TO SERVE!', '#1e7d46');
       }
       // The service bell.
       ctx.fillStyle = COLORS.mustard;
