@@ -955,11 +955,15 @@ function drawKitchen(ctx, state) {
   // across the shift, so the room itself tells the time the HUD numbers.
   {
     const progress = 1 - Math.max(0, state.shiftLeft) / 150;
+    // The dial steps up (AUDIT-V21 F2): at radius 11.5 the whole clock
+    // was ~14 px at the judge's size and its hands 3–5 px marks — a
+    // white rivet on the tiles, its one job (the room tells the time)
+    // invisible. At 14 the hands are marks a reader can find.
     ctx.fillStyle = '#fff7e6';
-    ctx.beginPath(); ctx.arc(640, 134, 11.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(640, 134, 14, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#5f4f3c';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(640, 134, 11.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.arc(640, 134, 14, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = '#22382e';
     ctx.lineCap = 'round';
     const hand = (angle, len, wdt) => {
@@ -969,8 +973,8 @@ function drawKitchen(ctx, state) {
       ctx.lineTo(640 + Math.sin(angle) * len, 134 - Math.cos(angle) * len);
       ctx.stroke();
     };
-    hand(progress * Math.PI, 5.5, 2.2);
-    hand(progress * Math.PI * 2, 8.5, 1.6);
+    hand(progress * Math.PI, 7, 2.6);
+    hand(progress * Math.PI * 2, 10.5, 2);
   }
   // The dresser on the right counter: a shelf of preserve jars over a stack of
   // plates, pure set dressing — this corner is the pantry.
@@ -1894,6 +1898,22 @@ function drawGuestFigure(ctx, state, g, slideY, alpha) {
     ctx.beginPath(); ctx.moveTo(x - 9, feetY - 36); ctx.lineTo(x - 6, feetY - 27); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x + 9, feetY - 36); ctx.lineTo(x + 6, feetY - 27); ctx.stroke();
     drawDish(ctx, g.holds, x, feetY - 31, 27);
+  } else if (g.mood === 'cross') {
+    // Hands on hips (AUDIT-V21 F1): a guest in the red zone stood in
+    // the same arms-down pose as the content guest beside him, and at
+    // this size a face alone cannot say "about to walk out" — the
+    // silhouette has to. The arms bend at the elbow, the elbows ride
+    // out past the coat's edge (±15 against its ±11), and the hands
+    // plant on the hips. A cross guest already holding a served line
+    // keeps the holding pose above: he has part of his order.
+    ctx.strokeStyle = g.look.coat;
+    ctx.lineWidth = 4.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x - 9.5, feetY - 36.5); ctx.lineTo(x - 15, feetY - 28); ctx.lineTo(x - 7.5, feetY - 19.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 9.5, feetY - 36.5); ctx.lineTo(x + 15, feetY - 28); ctx.lineTo(x + 7.5, feetY - 19.5); ctx.stroke();
+    ctx.fillStyle = g.look.skin;
+    ctx.beginPath(); ctx.arc(x - 7.5, feetY - 19.5, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 7.5, feetY - 19.5, 2.6, 0, Math.PI * 2); ctx.fill();
   } else {
     ctx.strokeStyle = g.look.coat;
     ctx.lineWidth = 4.5;
@@ -1946,7 +1966,10 @@ function drawGuestFigure(ctx, state, g, slideY, alpha) {
   } else {
     ctx.beginPath(); ctx.moveTo(x - 5.4, feetY - 57.6); ctx.lineTo(x - 1.2, feetY - 55.8); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x + 5.4, feetY - 57.6); ctx.lineTo(x + 1.2, feetY - 55.8); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x, feetY - 44.9, 2.8, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    // The cross frown steps wider (AUDIT-V21 F1): at 2.8 it was a
+    // speck under the brows; at 3.4 it sits under the hands-on-hips
+    // pose as the face's share of the same sentence.
+    ctx.beginPath(); ctx.arc(x, feetY - 44.9, 3.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
   }
   ctx.restore();
 }
