@@ -46,7 +46,9 @@ function title() {
   return s;
 }
 
-/** Peak rush: five tickets, two in the red, everything on the heat at once. */
+/** Peak rush: a full late-shift board — five tickets with a combo among them,
+ *  two in the red zone, and dishes in flight at the grill, the fryer and both
+ *  chopping boards at once. */
 function rush() {
   const s = createGame(11);
   s.phase = 'play';
@@ -67,6 +69,8 @@ function rush() {
   s.fryer = { item: 'potato_cut', t: 1.8 };
   s.boards[0].item = 'potato';
   s.boards[0].chops = 1;
+  s.boards[1].item = 'lettuce';
+  s.boards[1].chops = 1; // a second dish in flight, mid-chop on the far board
   s.plate = ['bun'];
   s.island.item = 'fillet_grilled'; // a fillet resting on the island, waiting its plate
   s.passDish = 'salad';

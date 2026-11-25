@@ -475,45 +475,51 @@ function drawMachine(ctx, state, station, machine) {
       ctx.quadraticCurveTo(sx + 6, cy - 40, sx - 1, cy - 53);
       ctx.stroke();
     }
-    // The call, on a solid badge drawn last of all, so neither the food nor the
-    // steam can hide it: green READY!, red BURNT!.
-    if (machine.t >= burnAt) drawBadge(ctx, cx, station.y + 17, 'BURNT!', '#a93420');
-    else if (machine.t >= cookAt) drawBadge(ctx, cx, station.y + 17, 'READY!', '#1e7d46');
+    // The call, on a solid badge in the station's top corner — drawn last of
+    // all, so neither food nor steam can hide it, and clear of the food it
+    // announces: green READY!, red BURNT!.
+    if (machine.t >= burnAt) drawBadge(ctx, station.x + station.w - 42, station.y + 13, 'BURNT!', '#a93420');
+    else if (machine.t >= cookAt) drawBadge(ctx, station.x + station.w - 42, station.y + 13, 'READY!', '#1e7d46');
   }
   text(ctx, station.label, cx, station.y + station.h - 8 + 6, 12, '#22382e');
 }
 
 function drawKitchen(ctx, state) {
-  // The floor: sea-washed deck planks across the whole room — real boards with
-  // staggered butt joints and a whisper of grain, kept low-contrast so the
-  // counters and the food stay the loudest things in the room.
-  ctx.fillStyle = COLORS.floor;
+  // The floor: warm harbour-deck planks across the whole room — honey wood with
+  // staggered butt joints and visible grain, kept a step quieter than the
+  // counters and the food so the room has depth without shouting.
+  ctx.fillStyle = '#e9d6ae';
   ctx.fillRect(0, BOARD_H, VIEW.width, VIEW.height - BOARD_H);
   const plankH = 32;
   const plankLen = 256;
   for (let row = 0, y = BOARD_H; y < VIEW.height; row++, y += plankH) {
-    ctx.fillStyle = row % 2 ? 'rgba(31,122,109,0.05)' : 'rgba(156,129,94,0.06)';
+    ctx.fillStyle = row % 2 ? 'rgba(171,124,72,0.13)' : 'rgba(120,84,46,0.08)';
     ctx.fillRect(0, y, VIEW.width, plankH);
-    ctx.strokeStyle = COLORS.floorLine;
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = '#bd9a67';
+    ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.moveTo(0, y + plankH); ctx.lineTo(VIEW.width, y + plankH); ctx.stroke();
     const startX = -((row * 173) % plankLen);
-    ctx.lineWidth = 1.1;
+    ctx.lineWidth = 1.2;
     for (let x = startX, p = 0; x < VIEW.width; x += plankLen, p++) {
       if (x > 0) {
         ctx.beginPath(); ctx.moveTo(x, y + 3); ctx.lineTo(x, y + plankH - 3); ctx.stroke();
       }
-      // Two short grain streaks per plank, placed by hash so they never move.
-      ctx.strokeStyle = 'rgba(95,79,60,0.10)';
-      ctx.lineWidth = 1;
+      // A per-plank tint shift, so the boards read as separate pieces of wood.
+      if (hash2(row * 11, p * 3) > 0.45) {
+        ctx.fillStyle = 'rgba(150,105,58,0.06)';
+        ctx.fillRect(Math.max(0, x), y + 1, Math.min(plankLen, VIEW.width - x), plankH - 2);
+      }
+      // Two grain streaks per plank, placed by hash so they never move.
+      ctx.strokeStyle = 'rgba(105,74,40,0.20)';
+      ctx.lineWidth = 1.1;
       for (let g = 0; g < 2; g++) {
         const gx = x + 24 + hash2(row * 3 + g, p) * (plankLen - 90);
         const gy = y + 8 + hash2(p * 7, row + g * 13) * 16;
         const gl = 22 + hash2(row + g, p * 5) * 30;
         ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + gl, gy); ctx.stroke();
       }
-      ctx.strokeStyle = COLORS.floorLine;
-      ctx.lineWidth = 1.1;
+      ctx.strokeStyle = '#bd9a67';
+      ctx.lineWidth = 1.2;
     }
   }
   // One soft braided rug, and only one: under the island, ringed in the room's colours.
@@ -531,6 +537,24 @@ function drawKitchen(ctx, state) {
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.fillRect(solid.x, solid.y, solid.w, 5);
   }
+  // The backsplash behind the back counter: sea-glass tiles the bins sit
+  // against, so the top row reads as a counter against a wall — with a harbour-
+  // blue painted strip above the tiles — not furniture floating on the floor.
+  ctx.fillStyle = '#33626e';
+  ctx.fillRect(20, BOARD_H, 1240, 7);
+  ctx.fillStyle = '#6fae9f';
+  ctx.fillRect(20, BOARD_H + 7, 1240, 25);
+  ctx.strokeStyle = 'rgba(240,250,246,0.45)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(20, BOARD_H + 19); ctx.lineTo(1260, BOARD_H + 19); ctx.stroke();
+  for (let tx = 20 + 46; tx < 1260; tx += 46) {
+    ctx.beginPath(); ctx.moveTo(tx, BOARD_H + 8); ctx.lineTo(tx, BOARD_H + 18); ctx.stroke();
+  }
+  for (let tx = 20 + 23; tx < 1260; tx += 46) {
+    ctx.beginPath(); ctx.moveTo(tx, BOARD_H + 20); ctx.lineTo(tx, BOARD_H + 31); ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillRect(20, BOARD_H + 7, 1240, 3);
   // The dresser on the right counter: a shelf of preserve jars over a stack of
   // plates, pure set dressing — this corner is the pantry.
   ctx.fillStyle = '#5f4f3c';
@@ -560,30 +584,51 @@ function drawKitchen(ctx, state) {
     ctx.beginPath(); ctx.arc(1208, 492, 13, a, a + 0.7); ctx.stroke();
   }
   text(ctx, 'PANTRY', 1175, 448, 11, COLORS.ink);
-  // Two portholes in the front of the pass, looking out at the harbour: brass rims,
-  // a strip of sky, the sea, and one small boat going about its business.
-  for (const px of [206, 282]) {
-    ctx.fillStyle = '#c99635';
-    ctx.beginPath(); ctx.arc(px, 728, 21, 0, Math.PI * 2); ctx.fill();
-    ctx.save();
-    ctx.beginPath(); ctx.arc(px, 728, 16.5, 0, Math.PI * 2); ctx.clip();
-    ctx.fillStyle = '#8fc3d4';
-    ctx.fillRect(px - 17, 711, 34, 13);
-    ctx.fillStyle = '#5b93a8';
-    ctx.fillRect(px - 17, 724, 34, 21);
-    ctx.fillStyle = '#274b52';
-    ctx.beginPath();
-    ctx.moveTo(px - 8, 727); ctx.lineTo(px + 8, 727); ctx.lineTo(px + 5, 731); ctx.lineTo(px - 5, 731);
-    ctx.closePath(); ctx.fill();
-    ctx.fillRect(px - 0.8, 718, 1.6, 9);
-    ctx.fillStyle = '#fff7e6';
-    ctx.beginPath(); ctx.moveTo(px + 1.6, 719); ctx.lineTo(px + 1.6, 726); ctx.lineTo(px + 7.5, 726); ctx.closePath(); ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = '#8a6a24';
-    for (const a of [0.78, 2.36, 3.93, 5.5]) {
-      ctx.beginPath(); ctx.arc(px + Math.cos(a) * 18.6, 728 + Math.sin(a) * 18.6, 1.5, 0, Math.PI * 2); ctx.fill();
-    }
+  // One large harbour window set into the front of the left counter, where two
+  // small portholes used to be: a wood frame, sky over sea, one fishing boat
+  // going about its business and gulls over the water.
+  ctx.fillStyle = '#5f4f3c';
+  rr(ctx, 170, 690, 158, 74, 6); ctx.fill();
+  ctx.fillStyle = '#8a6a24';
+  rr(ctx, 175, 695, 148, 64, 4); ctx.fill();
+  ctx.save();
+  rr(ctx, 179, 699, 140, 56, 3); ctx.clip();
+  ctx.fillStyle = '#a5d2de';
+  ctx.fillRect(179, 699, 140, 25);
+  ctx.fillStyle = '#4e8ca6';
+  ctx.fillRect(179, 724, 140, 31);
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 1.2;
+  for (const [wx, wy] of [[196, 734], [226, 743], [286, 737], [306, 747]]) {
+    ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + 11, wy); ctx.stroke();
   }
+  // The sun's glint in the top corner of the sky.
+  ctx.fillStyle = 'rgba(255,240,190,0.85)';
+  ctx.beginPath(); ctx.arc(302, 709, 6.5, 0, Math.PI * 2); ctx.fill();
+  // The boat: dark hull, one mast, a white sail, a red flag.
+  ctx.fillStyle = '#274b52';
+  ctx.beginPath();
+  ctx.moveTo(216, 730); ctx.lineTo(258, 730); ctx.lineTo(250, 738); ctx.lineTo(223, 738);
+  ctx.closePath(); ctx.fill();
+  ctx.fillRect(235.8, 712, 2.2, 18);
+  ctx.fillStyle = '#fff7e6';
+  ctx.beginPath(); ctx.moveTo(239.5, 713); ctx.lineTo(239.5, 728); ctx.lineTo(254, 728); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = COLORS.red;
+  ctx.beginPath(); ctx.moveTo(238, 712); ctx.lineTo(246, 714.4); ctx.lineTo(238, 716.8); ctx.closePath(); ctx.fill();
+  // Gulls: three small double-arcs over the water.
+  ctx.strokeStyle = '#33555e';
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  for (const [gx, gy] of [[200, 709], [222, 704], [272, 707]]) {
+    ctx.beginPath(); ctx.arc(gx - 3.4, gy, 3.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.beginPath(); ctx.arc(gx + 3.4, gy, 3.4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  }
+  ctx.restore();
+  // The frame's centre mullion and a brass latch.
+  ctx.fillStyle = '#5f4f3c';
+  ctx.fillRect(246, 695, 5, 64);
+  ctx.fillStyle = '#c99635';
+  ctx.beginPath(); ctx.arc(248.5, 752, 2.6, 0, Math.PI * 2); ctx.fill();
   // The specials board, chalked on the pass between plating and serve.
   ctx.fillStyle = '#22382e';
   rr(ctx, 796, 694, 80, 66, 4); ctx.fill();
@@ -643,16 +688,77 @@ function drawKitchen(ctx, state) {
       for (const px of [station.x + 95, station.x + 190, station.x + 285]) {
         ctx.beginPath(); ctx.moveTo(px, station.y + 6); ctx.lineTo(px, station.y + station.h - 6); ctx.stroke();
       }
-      // The herb trough: a dark box with bushy clumps, not a dotted line.
+      // Five potted herbs along the back edge, each drawn its own way — basil,
+      // rosemary, chives, parsley, mint — in little terracotta pots on a shelf,
+      // so the island's green reads as plants, not as a ribbon.
       ctx.fillStyle = '#5f4f3c';
-      rr(ctx, station.x + 10, station.y + 6, station.w - 20, 16, 4); ctx.fill();
-      for (let hx = station.x + 26, i = 0; hx < station.x + station.w - 16; hx += 24, i++) {
-        ctx.fillStyle = i % 2 ? '#6db457' : '#579a44';
-        ctx.beginPath(); ctx.arc(hx, station.y + 13, 6.8, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(hx + 5, station.y + 10, 4.6, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#a5dd8f';
-        ctx.beginPath(); ctx.arc(hx - 2, station.y + 10.5, 2.2, 0, Math.PI * 2); ctx.fill();
-      }
+      rr(ctx, station.x + 12, station.y + 22, station.w - 24, 5, 2); ctx.fill();
+      const potHerb = (px, kind) => {
+        const base = station.y + 22;
+        if (kind === 0) {
+          // Basil: broad oval leaves in two greens.
+          ctx.fillStyle = '#4e9440';
+          for (const [ox, oy, r] of [[-5.5, -15, 5], [5, -16.5, 5.4], [0, -12.5, 4.6]]) {
+            ctx.beginPath(); ctx.ellipse(px + ox, base + oy, r, r * 0.68, ox * 0.06, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.fillStyle = '#7cc464';
+          for (const [ox, oy] of [[-4, -16.5], [4.5, -18]]) {
+            ctx.beginPath(); ctx.ellipse(px + ox, base + oy, 2.4, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+          }
+        } else if (kind === 1) {
+          // Rosemary: stiff needles fanning up from one stem.
+          ctx.strokeStyle = '#3e7d3a';
+          ctx.lineWidth = 1.8;
+          ctx.lineCap = 'round';
+          for (const dx of [-7, -3.5, 0, 3.5, 7]) {
+            ctx.beginPath(); ctx.moveTo(px, base - 11);
+            ctx.lineTo(px + dx, base - 19 - (7 - Math.abs(dx)) * 0.5); ctx.stroke();
+          }
+          ctx.strokeStyle = '#579a44';
+          ctx.lineWidth = 1.2;
+          for (const dx of [-5, 0, 5]) {
+            ctx.beginPath(); ctx.moveTo(px, base - 11);
+            ctx.lineTo(px + dx, base - 16.5); ctx.stroke();
+          }
+        } else if (kind === 2) {
+          // Chives: tall thin blades, each with its own sway.
+          ctx.strokeStyle = '#63b34f';
+          ctx.lineWidth = 2.1;
+          ctx.lineCap = 'round';
+          for (const [dx, sway] of [[-6, -3], [-2, 1], [2, -1], [6, 3.5]]) {
+            ctx.beginPath(); ctx.moveTo(px + dx * 0.4, base - 11);
+            ctx.quadraticCurveTo(px + dx, base - 17, px + dx + sway, base - 21.5); ctx.stroke();
+          }
+        } else if (kind === 3) {
+          // Parsley: a curly cluster of small ruffled circles.
+          ctx.fillStyle = '#579a44';
+          for (const [ox, oy] of [[-5.5, -14], [-1.5, -17], [3, -14.5], [6, -16.5], [0.5, -13]]) {
+            ctx.beginPath(); ctx.arc(px + ox, base + oy, 3.1, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.fillStyle = '#a5dd8f';
+          for (const [ox, oy] of [[-3, -15.5], [3.5, -16]]) {
+            ctx.beginPath(); ctx.arc(px + ox, base + oy, 1.4, 0, Math.PI * 2); ctx.fill();
+          }
+        } else {
+          // Mint: two oval leaves with pale veins, leaning apart.
+          ctx.fillStyle = '#3f9155';
+          ctx.beginPath(); ctx.ellipse(px - 4.5, base - 15, 5.6, 3.4, -0.55, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(px + 4.5, base - 16, 5.6, 3.4, 0.55, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#a5dd8f';
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(px - 8, base - 13.4); ctx.lineTo(px - 1.5, base - 16.8); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(px + 1.5, base - 17.8); ctx.lineTo(px + 8, base - 14.4); ctx.stroke();
+        }
+        // The pot itself: a terracotta trapezoid under a darker rim.
+        ctx.fillStyle = '#b85c38';
+        ctx.beginPath();
+        ctx.moveTo(px - 7, base - 9); ctx.lineTo(px + 7, base - 9);
+        ctx.lineTo(px + 5, base); ctx.lineTo(px - 5, base);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#9c4c2c';
+        rr(ctx, px - 8, base - 12, 16, 3.6, 1.6); ctx.fill();
+      };
+      [46, 118, 190, 262, 334].forEach((off, i) => potHerb(station.x + off, i % 5));
       // The rest mat, centre stage.
       ctx.fillStyle = 'rgba(31,122,109,0.32)';
       rr(ctx, station.x + 118, station.y + 25, station.w - 236, 40, 8); ctx.fill();
@@ -806,6 +912,36 @@ function drawKitchen(ctx, state) {
       ctx.beginPath(); ctx.arc(station.x + station.w - 44, station.y + 48, 13, Math.PI, 0); ctx.fill();
       ctx.fillRect(station.x + station.w - 58, station.y + 48, 28, 4);
     }
+  }
+  // A lamp rail over the island with two enamel pendants hanging from it.
+  // Their warm pool over the island is most of why the middle of the room
+  // feels like evening service instead of a bare floor with a table on it.
+  ctx.fillStyle = 'rgba(255,205,120,0.07)';
+  ctx.beginPath(); ctx.ellipse(640, 462, 208, 64, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#4a3b2a';
+  rr(ctx, 452, 246, 376, 10, 5); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  rr(ctx, 452, 254, 376, 3, 1.5); ctx.fill();
+  for (const lx of [548, 732]) {
+    ctx.strokeStyle = '#2b2320';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(lx, 256); ctx.lineTo(lx, 310); ctx.stroke();
+    // The glow around the bulb, two soft rings of warm light.
+    ctx.fillStyle = 'rgba(255,214,130,0.10)';
+    ctx.beginPath(); ctx.arc(lx, 330, 48, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,214,130,0.16)';
+    ctx.beginPath(); ctx.arc(lx, 330, 29, 0, Math.PI * 2); ctx.fill();
+    // The enamel dome shade, harbour teal with a brass rim.
+    ctx.fillStyle = COLORS.tealDark;
+    ctx.beginPath();
+    ctx.moveTo(lx - 26, 330); ctx.lineTo(lx - 9, 308);
+    ctx.quadraticCurveTo(lx, 301, lx + 9, 308); ctx.lineTo(lx + 26, 330);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#c99635';
+    ctx.fillRect(lx - 26, 328, 52, 4);
+    // The bulb itself.
+    ctx.fillStyle = '#ffd968';
+    ctx.beginPath(); ctx.arc(lx, 335, 5.5, 0, Math.PI * 2); ctx.fill();
   }
 }
 
