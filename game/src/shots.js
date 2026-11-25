@@ -33,7 +33,7 @@ function cover() {
   s.chef.x = 560;
   s.chef.y = 636;
   s.chef.carry = 'tomato_cut'; // the very piece the Harbour Plate is missing
-  s.popups = [{ x: 1062, y: 640, text: '+$16', color: '#1f7a6d', t: 0.4, life: 1.4 }];
+  s.popups = [{ x: 1052, y: 600, text: '+$16', color: '#1f7a6d', t: 0.4, life: 1.4 }];
   return s;
 }
 
@@ -75,7 +75,7 @@ function rush() {
   s.chef.y = 636;
   s.chef.carry = 'prawns'; // carrying the answer to ticket #9
   s.popups = [
-    { x: 1062, y: 636, text: '+$21 TOP TIP!', color: '#1f7a6d', t: 0.25, life: 1.4 },
+    { x: 1100, y: 592, text: '+$21 TOP TIP!', color: '#1f7a6d', t: 0.25, life: 1.4 },
     { x: 700, y: 300, text: 'HURRY!', color: '#d84a2f', t: 0.7, life: 1.4 },
   ];
   return s;

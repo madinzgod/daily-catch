@@ -66,7 +66,7 @@ export const STATIONS = [
   { id: 'board-1', kind: 'board', label: 'CHOP', x: 30, y: 282, w: 150, h: 108 },
   { id: 'board-2', kind: 'board', label: 'CHOP', x: 30, y: 406, w: 150, h: 108 },
   { id: 'fryer', kind: 'fryer', label: 'FRYER', x: 1100, y: 282, w: 150, h: 108 },
-  { id: 'island', kind: 'island', label: 'RESTING ISLAND', x: 490, y: 420, w: 300, h: 84 },
+  { id: 'island', kind: 'island', label: 'RESTING ISLAND', x: 450, y: 420, w: 380, h: 84 },
   { id: 'trash', kind: 'trash', label: 'BIN', x: 36, y: 690, w: 120, h: 76 },
   { id: 'plating', kind: 'plating', label: 'PLATING', x: 330, y: 690, w: 460, h: 76 },
   { id: 'serve', kind: 'serve', label: 'SERVE', x: 880, y: 690, w: 364, h: 76 },
@@ -77,7 +77,7 @@ export const SOLIDS = [
   { x: 20, y: 130, w: 1240, h: 96 },
   { x: 20, y: 272, w: 170, h: 264 },
   { x: 1090, y: 272, w: 170, h: 264 },
-  { x: 480, y: 410, w: 320, h: 104 },
+  { x: 440, y: 410, w: 400, h: 104 },
   { x: 20, y: 676, w: 1240, h: 104 },
 ];
 
