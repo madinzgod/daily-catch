@@ -6,6 +6,38 @@ import { BOARD_H, COLORS, FRYER_BURN, FRYER_COOK, GRILL_BURN, GRILL_COOK, SOLIDS
 import { DISHES, COOKED, FRIES, INGREDIENTS, RECIPES, recipeForStack } from './recipes.js';
 import { nearestStation } from './actions.js';
 
+/**
+ * Draw one whole frame of the game from the state — every pixel the game ever
+ * shows comes out of this function and the drawing helpers below it.
+ */
+export function draw(ctx, state) {
+  ctx.fillStyle = COLORS.wall;
+  ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+  drawKitchen(ctx, state);
+  drawChef(ctx, state);
+  drawBoard(ctx, state);
+  // Floating score notes. Each one is clamped fully inside the frame, however
+  // long its text and wherever it was born — no more tips clipped at the edge.
+  for (const popup of state.popups) {
+    ctx.font = `700 19px ${FONT}`;
+    const half = ctx.measureText(popup.text).width / 2;
+    const px = Math.min(Math.max(popup.x, half + 8), VIEW.width - half - 8);
+    const py = Math.max(popup.y, BOARD_H + 16);
+    ctx.globalAlpha = Math.max(0, 1 - popup.t / popup.life);
+    text(ctx, popup.text, px, py, 19, popup.color);
+    ctx.globalAlpha = 1;
+  }
+  drawOverlays(ctx, state);
+  // The prompt strip along the very bottom.
+  if (state.phase === 'play') {
+    ctx.fillStyle = 'rgba(23,32,36,0.88)';
+    ctx.fillRect(0, VIEW.height - 21, VIEW.width, 21);
+    const showHint = (state.shakeT > 0 || state.hintT > 0) && state.hint;
+    const msg = showHint ? state.hint : state.promptText || '';
+    text(ctx, msg, VIEW.width / 2, VIEW.height - 10, 13.5, showHint ? '#ffab97' : '#e8f0ea');
+  }
+}
+
 const FONT = "'Trebuchet MS', 'Segoe UI', Verdana, sans-serif";
 
 function rr(ctx, x, y, w, h, r) {
@@ -943,6 +975,9 @@ function drawKitchen(ctx, state) {
 function drawChef(ctx, state) {
   const chef = state.chef;
   const bob = Math.sin(chef.walk) * 2.4;
+  // A full board — five tickets, the most the board can hold — is the one
+  // moment the cook's face changes: brows down, mouth flat, sweat flying.
+  const strained = state.phase === 'play' && state.tickets.length >= 5;
   const x = chef.x;
   const y = chef.y + bob * 0.3;
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
@@ -977,9 +1012,50 @@ function drawChef(ctx, state) {
   for (const side of [-1, 1]) {
     ctx.beginPath(); ctx.arc(x + side * 5.6, y - 22 + bob * 0.2, 1.7, 0, Math.PI * 2); ctx.fill();
   }
-  ctx.strokeStyle = '#a96a3f';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(x, y - 17.5 + bob * 0.2, 5.6, 0.25, Math.PI - 0.25); ctx.stroke();
+  if (strained) {
+    // Determined brows, angled down toward the nose.
+    ctx.strokeStyle = '#7a4a26';
+    ctx.lineWidth = 1.9;
+    ctx.lineCap = 'round';
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(x + side * 10.2, y - 29.5 + bob * 0.2);
+      ctx.lineTo(x + side * 3.4, y - 26.8 + bob * 0.2);
+      ctx.stroke();
+    }
+    // A flat, set mouth instead of the smile.
+    ctx.strokeStyle = '#a96a3f';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(x - 4.6, y - 15.6 + bob * 0.2);
+    ctx.lineTo(x + 4.6, y - 16.4 + bob * 0.2);
+    ctx.stroke();
+    // Sweat, flung off both sides of the head and beading at the temple.
+    const drop = (dx, dy, s, rot) => {
+      ctx.save();
+      ctx.translate(x + dx, y + dy);
+      ctx.rotate(rot);
+      ctx.scale(s, s);
+      ctx.fillStyle = '#8ecfe8';
+      ctx.beginPath();
+      ctx.moveTo(0, -7);
+      ctx.quadraticCurveTo(4.6, 0.5, 3.6, 3.4);
+      ctx.quadraticCurveTo(2.6, 6.4, 0, 6.4);
+      ctx.quadraticCurveTo(-2.6, 6.4, -3.6, 3.4);
+      ctx.quadraticCurveTo(-4.6, 0.5, 0, -7);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.beginPath(); ctx.arc(-1.2, 2.6, 1.1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    };
+    drop(-24, -30, 0.9, -0.5);
+    drop(24.5, -25, 0.75, 0.55);
+    drop(-19, -12, 0.55, -0.9);
+  } else {
+    ctx.strokeStyle = '#a96a3f';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y - 17.5 + bob * 0.2, 5.6, 0.25, Math.PI - 0.25); ctx.stroke();
+  }
   ctx.fillStyle = 'rgba(216,74,47,0.32)';
   for (const side of [-1, 1]) {
     ctx.beginPath(); ctx.arc(x + side * 10.5, y - 17 + bob * 0.2, 2.8, 0, Math.PI * 2); ctx.fill();
@@ -1021,8 +1097,13 @@ function drawBoard(ctx, state) {
     ctx.fillStyle = COLORS.paper;
     rr(ctx, x, y, cardW, h, 7); ctx.fill();
     if (frac < 0.25) {
-      ctx.strokeStyle = COLORS.red;
+      // The red zone, drawn to shout in a still frame: a soft alarm halo
+      // outside the card and a hard red border on it.
+      ctx.strokeStyle = 'rgba(216,74,47,0.4)';
       ctx.lineWidth = 3;
+      rr(ctx, x - 3.5, y - 3.5, cardW + 7, h + 7, 9); ctx.stroke();
+      ctx.strokeStyle = COLORS.red;
+      ctx.lineWidth = 3.4;
       rr(ctx, x, y, cardW, h, 7); ctx.stroke();
     }
     const main = ticket.items[0];
@@ -1050,6 +1131,16 @@ function drawBoard(ctx, state) {
     rr(ctx, x + 8, y + h - 13, cardW - 16, 7, 3.5); ctx.fill();
     ctx.fillStyle = frac > 0.5 ? COLORS.timerGood : frac > 0.25 ? COLORS.timerMid : COLORS.timerBad;
     if (frac > 0) { rr(ctx, x + 8, y + h - 13, (cardW - 16) * frac, 7, 3.5); ctx.fill(); }
+    if (frac < 0.25) {
+      // Last of all on the card: a filled alarm disc on its top corner with a
+      // white bang — the one mark on the board nobody can miss at a glance.
+      ctx.fillStyle = COLORS.red;
+      ctx.beginPath(); ctx.arc(x + cardW - 3, y + 3, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x + cardW - 3, y + 3, 11, 0, Math.PI * 2); ctx.stroke();
+      text(ctx, '!', x + cardW - 3, y + 4, 15, '#ffffff');
+    }
   });
   if (state.tickets.length === 0 && state.phase === 'play') {
     text(ctx, 'No orders — breathe. The rush is coming…', 20, 62, 16, '#9fb4ac', 'left', false);
@@ -1140,34 +1231,5 @@ function drawOverlays(ctx, state) {
     chalkPanel(ctx, 290, 606, 700, 64);
     text(ctx, 'FROM THE PASS — THE SHIFT IN WORK', cx, 625, 11, '#9fb4ac');
     text(ctx, `CHOPS ${stats.chops}      GRILLS FIRED ${stats.grills}      FRYERS DROPPED ${stats.fries}      BURNT ${stats.burns}`, cx, 650, 16, COLORS.cream);
-  }
-}
-
-/** Draw one whole frame of the game from the state. */
-export function draw(ctx, state) {
-  ctx.fillStyle = COLORS.wall;
-  ctx.fillRect(0, 0, VIEW.width, VIEW.height);
-  drawKitchen(ctx, state);
-  drawChef(ctx, state);
-  drawBoard(ctx, state);
-  // Floating score notes. Each one is clamped fully inside the frame, however
-  // long its text and wherever it was born — no more tips clipped at the edge.
-  for (const popup of state.popups) {
-    ctx.font = `700 19px ${FONT}`;
-    const half = ctx.measureText(popup.text).width / 2;
-    const px = Math.min(Math.max(popup.x, half + 8), VIEW.width - half - 8);
-    const py = Math.max(popup.y, BOARD_H + 16);
-    ctx.globalAlpha = Math.max(0, 1 - popup.t / popup.life);
-    text(ctx, popup.text, px, py, 19, popup.color);
-    ctx.globalAlpha = 1;
-  }
-  drawOverlays(ctx, state);
-  // The prompt strip along the very bottom.
-  if (state.phase === 'play') {
-    ctx.fillStyle = 'rgba(23,32,36,0.88)';
-    ctx.fillRect(0, VIEW.height - 21, VIEW.width, 21);
-    const showHint = (state.shakeT > 0 || state.hintT > 0) && state.hint;
-    const msg = showHint ? state.hint : state.promptText || '';
-    text(ctx, msg, VIEW.width / 2, VIEW.height - 10, 13.5, showHint ? '#ffab97' : '#e8f0ea');
   }
 }

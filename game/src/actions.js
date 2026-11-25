@@ -10,12 +10,6 @@ import { addPopup, heat } from './kitchen.js';
 import { serveDish, spawnTicket, updateTickets } from './orders.js';
 import { sfx } from './sound.js';
 
-function distanceToRect(x, y, rect) {
-  const dx = Math.max(rect.x - x, 0, x - (rect.x + rect.w));
-  const dy = Math.max(rect.y - y, 0, y - (rect.y + rect.h));
-  return Math.hypot(dx, dy);
-}
-
 /** The station the chef can use right now, or null when they are mid-floor. */
 export function nearestStation(state) {
   let best = null;
@@ -28,18 +22,6 @@ export function nearestStation(state) {
     }
   }
   return best;
-}
-
-function boardOf(state, station) {
-  return state.boards.find((b) => b.station === station);
-}
-
-function refuse(state, station, why) {
-  state.shake = station.id;
-  state.shakeT = 0.3;
-  state.hint = why;
-  state.hintT = 2.4;
-  sfx.error();
 }
 
 /**
@@ -287,4 +269,24 @@ export function update(state, dt, input) {
   if (state.popups.length === 0 && state.hint) {
     // Hints linger until the next one replaces them; nothing to do.
   }
+}
+
+// --- Helpers the verbs above share ---------------------------------------------
+
+function distanceToRect(x, y, rect) {
+  const dx = Math.max(rect.x - x, 0, x - (rect.x + rect.w));
+  const dy = Math.max(rect.y - y, 0, y - (rect.y + rect.h));
+  return Math.hypot(dx, dy);
+}
+
+function boardOf(state, station) {
+  return state.boards.find((b) => b.station === station);
+}
+
+function refuse(state, station, why) {
+  state.shake = station.id;
+  state.shakeT = 0.3;
+  state.hint = why;
+  state.hintT = 2.4;
+  sfx.error();
 }

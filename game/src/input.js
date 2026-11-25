@@ -1,10 +1,6 @@
 // Keyboard and mouse input: held keys for walking, edge-triggered presses for actions,
 // and a click-to-walk target for the mouse. Nothing here knows what the keys mean.
 
-const held = new Set();
-const pressed = new Set();
-let clickTarget = null;
-
 export function attachInput(target) {
   target.addEventListener('keydown', (event) => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
@@ -20,6 +16,11 @@ export function attachClicks(canvas, toWorld) {
     clickTarget = toWorld(event.clientX, event.clientY);
   });
 }
+
+// The listener state the functions above fill and the ones below read.
+const held = new Set();
+const pressed = new Set();
+let clickTarget = null;
 
 export function isDown(code) {
   return held.has(code);
