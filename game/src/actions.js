@@ -81,6 +81,8 @@ export function interact(state) {
       machine.item = held;
       machine.t = 0;
       chef.carry = null;
+      if (station.kind === 'grill') state.stats.grills += 1;
+      else state.stats.fries += 1;
       sfx.place();
       return;
     }
@@ -115,7 +117,10 @@ export function interact(state) {
     if (held) return refuse(state, station, 'Hands full — chop with empty hands');
     board.chops += 1;
     sfx.chop();
-    if (board.chops >= recipe.presses) sfx.ready();
+    if (board.chops >= recipe.presses) {
+      state.stats.chops += 1; // a finished chop, counted for the shift's story
+      sfx.ready();
+    }
     return;
   }
 
@@ -248,8 +253,14 @@ export function update(state, dt, input) {
 
   moveChef(state, dt, input);
 
-  if (state.grill.item) state.grill.t += dt;
-  if (state.fryer.item) state.fryer.t += dt;
+  // Cooking advances, and the moment a piece crosses from ready to burnt the
+  // shift's story counts it — once per piece, at the crossing.
+  for (const [machine, burnAt] of [[state.grill, GRILL_BURN], [state.fryer, FRYER_BURN]]) {
+    if (!machine.item) continue;
+    const was = machine.t;
+    machine.t += dt;
+    if (was < burnAt && machine.t >= burnAt) state.stats.burns += 1;
+  }
   if (state.passT > 0) {
     state.passT -= dt;
     if (state.passT <= 0) state.passDish = null;

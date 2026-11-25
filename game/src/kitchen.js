@@ -13,6 +13,7 @@ export function createGame(seed) {
     score: 0,
     served: 0,
     servedBy: {}, // dish id -> lines handed over: the shift's story, dish by dish
+    stats: { chops: 0, grills: 0, fries: 0, burns: 0 }, // the shift in work, counted at the stations as it happens
     walkouts: 0,
     bestTip: 0,
     chef: { x: 640, y: 596, face: 1, carry: null, walk: 0 },

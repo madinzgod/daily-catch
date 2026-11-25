@@ -93,6 +93,12 @@ function end() {
   s.served = 14;
   // Fourteen tickets, three of them combos: fourteen plates plus three chips.
   s.servedBy = { fillet: 2, salad: 2, butty: 4, harbour: 4, prawns: 2, fries: 3 };
+  // The same shift counted in work, and it agrees with the dishes above:
+  // chops 23 = lettuce 12 (salad 2 + butty 4 + harbour 4 + prawns 2) + tomato 8
+  // (salad 2 + harbour 4 + prawns 2) + potato 3 (the combos' chips); grills
+  // fired 12 = fillets 10 (2 + 4 + 4) + prawns 2; fryers dropped 3 = the chips;
+  // and one fillet was left on the heat too long and binned along the way.
+  s.stats = { chops: 23, grills: 12, fries: 3, burns: 1 };
   s.walkouts = 1;
   s.bestTip = 9;
   s.shiftLeft = 0;

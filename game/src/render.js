@@ -175,7 +175,9 @@ export function drawItem(ctx, item, x, y, s) {
       for (const [px, py] of [[-7, -3], [4, 2], [9, -5], [-2, 6]]) { ctx.beginPath(); ctx.arc(px, py, 1.8, 0, Math.PI * 2); ctx.fill(); }
       break;
     case 'potato_cut':
-      ctx.fillStyle = '#ecd28e';
+      // Cut potato, one step deeper toward the chips' gold than it used to be —
+      // raw still reads paler than the fried sticks, but no longer washed out.
+      ctx.fillStyle = '#eabd60';
       for (const [ox, rot] of [[-10, -0.16], [-3, 0.07], [4, -0.06], [11, 0.16]]) {
         ctx.save(); ctx.translate(ox, 0); ctx.rotate(rot); rr(ctx, -3, -13, 6, 26, 2); ctx.fill(); ctx.restore();
       }
@@ -404,7 +406,7 @@ function drawMidChop(ctx, item, chops, x, y, s) {
     ctx.beginPath(); ctx.ellipse(10, -8.5, 5, 2.6, 0, 0, Math.PI * 2); ctx.fill();
   } else if (item === 'potato') {
     // Sticks already cut, standing to the left; the rest of the potato beside them.
-    ctx.fillStyle = '#ecd28e';
+    ctx.fillStyle = '#eabd60';
     for (let i = 0; i < chops; i++) {
       ctx.save();
       ctx.translate(-13 + i * 6.5, 1);
@@ -414,7 +416,7 @@ function drawMidChop(ctx, item, chops, x, y, s) {
     }
     ctx.fillStyle = '#cfa15f';
     ctx.beginPath(); ctx.ellipse(10, 1, 15 - chops * 2.4, 10.5, 0.25, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ecd28e';
+    ctx.fillStyle = '#eabd60';
     ctx.beginPath(); ctx.ellipse(1.5, 0, 3, 8.4, 0.25, 0, Math.PI * 2); ctx.fill();
   } else if (item === 'lettuce') {
     // A growing pile of shreds, and the leaf it came from, shrinking.
@@ -812,37 +814,30 @@ function drawKitchen(ctx, state) {
         if (DISHES[state.island.item]) drawDish(ctx, state.island.item, cx, station.y + 42, 64);
         else drawItem(ctx, state.island.item, cx, station.y + 41, 50);
       }
-      // The utensil rail on the island's front face: spatula, ladle, whisk, knife.
+      // Two pans hang from the rail on the island's front face — one dark iron,
+      // one copper — drawn big enough to read as cookware at contact-sheet
+      // size, where the old rail of slim utensils all but vanished.
       ctx.fillStyle = COLORS.steelDark;
       rr(ctx, station.x + 90, station.y + station.h + 4, station.w - 180, 5, 2.5); ctx.fill();
-      const hang = (ux, drawHead) => {
-        ctx.fillStyle = '#5d4030';
-        ctx.fillRect(ux - 2, station.y + station.h + 9, 4, 9);
-        ctx.save();
-        ctx.translate(ux, station.y + station.h + 18);
-        drawHead();
-        ctx.restore();
+      const pan = (px, r, body, rim, inner) => {
+        const top = station.y + station.h + 9;
+        // The handle: a flat strap from the rail down to the pan's rim.
+        ctx.fillStyle = '#6d6257';
+        rr(ctx, px - 3.5, top, 7, 22, 3); ctx.fill();
+        // The pan itself: body first, a bright rim around it, the dark
+        // cooking face inside, and one soft highlight on the metal.
+        ctx.fillStyle = body;
+        ctx.beginPath(); ctx.arc(px, top + 22 + r, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = rim;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(px, top + 22 + r, r - 1.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = inner;
+        ctx.beginPath(); ctx.arc(px, top + 22 + r, r * 0.6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.20)';
+        ctx.beginPath(); ctx.arc(px - r * 0.34, top + 22 + r - r * 0.36, r * 0.2, 0, Math.PI * 2); ctx.fill();
       };
-      hang(station.x + 118, () => {
-        ctx.fillStyle = COLORS.steel;
-        rr(ctx, -6.5, 0, 13, 11, 2.5); ctx.fill();
-      });
-      hang(station.x + 172, () => {
-        ctx.strokeStyle = COLORS.steel;
-        ctx.lineWidth = 2.4;
-        ctx.beginPath(); ctx.arc(0, 6, 6, 0, Math.PI * 2); ctx.stroke();
-      });
-      hang(station.x + 226, () => {
-        ctx.strokeStyle = COLORS.steel;
-        ctx.lineWidth = 1.8;
-        for (const spread of [-4.5, 0, 4.5]) {
-          ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(spread, 6, 0, 12); ctx.stroke();
-        }
-      });
-      hang(station.x + 280, () => {
-        ctx.fillStyle = COLORS.steel;
-        ctx.beginPath(); ctx.moveTo(-2.5, 0); ctx.lineTo(3.5, 0); ctx.lineTo(3.5, 8); ctx.lineTo(-2.5, 12); ctx.closePath(); ctx.fill();
-      });
+      pan(station.x + 148, 18, '#43484b', COLORS.steel, '#2e3235');
+      pan(station.x + 232, 15, '#b87333', '#8c5524', '#96582a');
     } else if (station.kind === 'board') {
       const board = state.boards.find((b) => b.station === station);
       ctx.fillStyle = '#d9b77c';
@@ -1076,6 +1071,21 @@ function chalkPanel(ctx, x, y, w, h) {
   rr(ctx, x + 6, y + 6, w - 12, h - 12, 5); ctx.fill();
 }
 
+/**
+ * The kitchen grade for a finished shift. The bands are priced from the
+ * competent-policy audit's measured scores (24 seeds: worst $59, median $85.5,
+ * best $100) — S is the top of what a strong run actually reaches, the median
+ * run earns its B, and no band is priced for a player the audit cannot find.
+ */
+export function gradeFor(score) {
+  if (score >= 95) return ['S', 'CHEF-PATRON'];
+  if (score >= 90) return ['A', 'EXECUTIVE CHEF'];
+  if (score >= 80) return ['B', 'SOUS CHEF'];
+  if (score >= 70) return ['C', 'LINE COOK'];
+  if (score >= 55) return ['D', 'KITCHEN HAND'];
+  return ['E', 'DISH PIG (AFFECTIONATE)'];
+}
+
 function drawOverlays(ctx, state) {
   if (state.phase === 'play') return;
   ctx.fillStyle = 'rgba(23, 32, 36, 0.78)';
@@ -1098,7 +1108,7 @@ function drawOverlays(ctx, state) {
       text(ctx, dish.name, 334, y - 8, 15.5, COLORS.cream, 'left');
       const parts = menuNotes[dish.id]
         || dish.items.map((item) => INGREDIENTS[item].name.toLowerCase()).join(' + ');
-      text(ctx, parts, 334, y + 11, 12, '#9fb4ac', 'left', false);
+      text(ctx, parts, 334, y + 12, 13, '#9fb4ac', 'left', false);
       text(ctx, `$${dish.price}`, 1013, y - 2, 16.5, '#ffd968', 'right');
     });
     text(ctx, 'Combo tickets pair a plate with chips — one route, two lines, a bigger tip.', cx, 526, 13, '#9fb4ac', 'center', false);
@@ -1121,14 +1131,15 @@ function drawOverlays(ctx, state) {
       text(ctx, `${dish.name} ×${n}`, colX - 56, y, 15.5, n > 0 ? COLORS.cream : '#71827a', 'left', false);
     });
     text(ctx, `Dishes served ${state.served}      Walkouts ${state.walkouts}      Best tip $ ${state.bestTip}`, cx, 490, 17.5, '#cfe0d8', 'center', false);
-    const [letter, title] = state.score >= 250 ? ['S', 'EXECUTIVE CHEF']
-      : state.score >= 200 ? ['A', 'EXECUTIVE CHEF']
-      : state.score >= 150 ? ['B', 'SOUS CHEF']
-      : state.score >= 100 ? ['C', 'LINE COOK']
-      : state.score >= 50 ? ['D', 'KITCHEN HAND']
-      : ['E', 'DISH PIG (AFFECTIONATE)'];
+    const [letter, title] = gradeFor(state.score);
     text(ctx, `KITCHEN GRADE: ${letter} — ${title}`, cx, 532, 22, COLORS.mustard);
     text(ctx, 'PRESS R TO WORK ANOTHER SHIFT', cx, 578, 17, '#7dff9a');
+    // The shift in work, counted at the stations as it happened — the frame's
+    // lower third tells the same story in labour instead of money.
+    const stats = state.stats || { chops: 0, grills: 0, fries: 0, burns: 0 };
+    chalkPanel(ctx, 290, 606, 700, 64);
+    text(ctx, 'FROM THE PASS — THE SHIFT IN WORK', cx, 625, 11, '#9fb4ac');
+    text(ctx, `CHOPS ${stats.chops}      GRILLS FIRED ${stats.grills}      FRYERS DROPPED ${stats.fries}      BURNT ${stats.burns}`, cx, 650, 16, COLORS.cream);
   }
 }
 
