@@ -72,16 +72,19 @@ function title() {
 
 /** Peak rush: a full late-shift board — five tickets with a combo among them,
  *  two in the red zone, and dishes in flight at the grill, the fryer and both
- *  chopping boards at once. */
+ *  chopping boards at once. The scoreboard stays inside the game's measured
+ *  economy: the difficulty audit's best full shift is $100 and 8 served, so a
+ *  frame at 0:32 left shows a strong shift on its way there (7 served, $86),
+ *  never numbers no run has reached. */
 function rush() {
   const s = createGame(11);
   s.phase = 'play';
   s.time = 118;
   s.shiftLeft = 32;
-  s.score = 214;
-  s.served = 12;
+  s.score = 86;
+  s.served = 7;
   s.walkouts = 0;
-  s.bestTip = 9;
+  s.bestTip = 6;
   s.tickets = [
     ticket(9, [['prawns', false]], 14, 12, 57),
     ticket(10, [['butty', false], ['fries', false]], 18, 26, 64),
@@ -103,7 +106,7 @@ function rush() {
   s.chef.y = 636;
   s.chef.carry = 'prawns'; // carrying the answer to ticket #9
   s.popups = [
-    { x: 1100, y: 592, text: '+$21 TOP TIP!', color: '#1f7a6d', t: 0.25, life: 1.4 },
+    { x: 1100, y: 592, text: '+$20 TOP TIP!', color: '#1f7a6d', t: 0.25, life: 1.4 },
     { x: 700, y: 300, text: 'HURRY!', color: '#d84a2f', t: 0.7, life: 1.4 },
   ];
   return s;

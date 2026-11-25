@@ -659,6 +659,29 @@ function drawFryerCooking(ctx, cx, cy) {
   }
 }
 
+/**
+ * Prawns on the grill, drawn as a spaced row of individuals across the
+ * bars — the tray treatment from the island (AUDIT-V13 P3), applied to
+ * the other surface where prawns rest. Through drawItem they land as
+ * the three-curl overlapping pile, which reads as one orange mass on
+ * the grill's dark panel; in a row, each prawn keeps its own outline
+ * in whichever state — raw, grilled, burnt — the clock says.
+ */
+function drawGrillPrawns(ctx, shown, cx, cy) {
+  const cols = shown === 'prawns_raw' ? { body: '#e8ab90', line: '#bd7f63' }
+    : shown === 'prawns_grilled' ? { body: '#f4834f', line: '#c25227' }
+      : { body: '#503a2c', line: '#2e2019' };
+  const sheen = shown !== 'prawns_burnt';
+  for (const [ox, oy, rot] of [[-37, -3, 0.35], [1, -6, 2.45], [38, -3, -0.85]]) {
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath(); ctx.ellipse(cx + ox, cy + oy + 9, 15, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(cx + ox, cy + oy);
+    drawPrawn(ctx, cols, rot, sheen);
+    ctx.restore();
+  }
+}
+
 function drawMachine(ctx, state, station, machine) {
   const kind = station.kind;
   const cookAt = kind === 'grill' ? GRILL_COOK : FRYER_COOK;
@@ -673,8 +696,10 @@ function drawMachine(ctx, state, station, machine) {
     const cook = COOKED[machine.item];
     const shown = machine.t >= burnAt ? cook.burnt : machine.t >= cookAt ? cook.makes : machine.item;
     // In the fryer, raw cut potato gets its own cooking scene (batons in
-    // bubbling oil); everywhere else the item itself is the picture.
+    // bubbling oil); on the grill, prawns get their spaced row; everywhere
+    // else the item itself is the picture.
     if (kind === 'fryer' && machine.t < cookAt) drawFryerCooking(ctx, cx, cy);
+    else if (kind === 'grill' && shown.startsWith('prawns')) drawGrillPrawns(ctx, shown, cx, cy);
     else drawItem(ctx, shown, cx, cy - 4, kind === 'grill' ? 54 : 52);
     const color = machine.t >= burnAt ? COLORS.red : machine.t >= cookAt ? COLORS.timerGood : COLORS.mustard;
     drawProgress(ctx, station.x + 16, station.y + station.h - 20, station.w - 32, machine.t / burnAt, color);
@@ -851,7 +876,14 @@ function drawKitchen(ctx, state) {
   // The sun's glint in the top corner of the sky.
   ctx.fillStyle = 'rgba(255,240,190,0.85)';
   ctx.beginPath(); ctx.arc(302, 709, 6.5, 0, Math.PI * 2); ctx.fill();
-  // The boat: dark hull, one mast, a white sail, a red flag.
+  // The boat: dark hull, one mast, a white sail, a red flag. The window
+  // itself is as large as the counter face allows (V13), so the picture
+  // inside it grows instead: the boat is scaled up about its own centre,
+  // or at judge size it stays a dark dash with a white fleck for a sail.
+  ctx.save();
+  ctx.translate(237, 725);
+  ctx.scale(1.3, 1.3);
+  ctx.translate(-237, -725);
   ctx.fillStyle = '#274b52';
   ctx.beginPath();
   ctx.moveTo(216, 730); ctx.lineTo(258, 730); ctx.lineTo(250, 738); ctx.lineTo(223, 738);
@@ -861,6 +893,7 @@ function drawKitchen(ctx, state) {
   ctx.beginPath(); ctx.moveTo(239.5, 713); ctx.lineTo(239.5, 728); ctx.lineTo(254, 728); ctx.closePath(); ctx.fill();
   ctx.fillStyle = COLORS.red;
   ctx.beginPath(); ctx.moveTo(238, 712); ctx.lineTo(246, 714.4); ctx.lineTo(238, 716.8); ctx.closePath(); ctx.fill();
+  ctx.restore();
   // Gulls: three small double-arcs over the water.
   ctx.strokeStyle = '#33555e';
   ctx.lineWidth = 1.6;
@@ -883,10 +916,12 @@ function drawKitchen(ctx, state) {
   ctx.strokeStyle = '#5f4f3c';
   ctx.lineWidth = 3;
   rr(ctx, 796, 694, 80, 66, 4); ctx.stroke();
-  text(ctx, 'SPECIALS', 836, 707, 10.5, '#ffd968');
-  text(ctx, 'Harbour', 836, 725, 10.5, '#fff7e6', 'center', false);
-  text(ctx, 'Plate $13', 836, 740, 10.5, '#fff7e6', 'center', false);
-  text(ctx, 'Prawn $14', 836, 752, 10.5, '#fff7e6', 'center', false);
+  text(ctx, 'SPECIALS', 836, 709, 10.5, '#ffd968');
+  // Two whole lines: the board is 80 wide and cannot grow (plating ends at
+  // 790, serve starts at 880), and "Harbour Plate $13" snapped in half at
+  // that width — a fragment, a price line and a dish. The words give way.
+  text(ctx, 'Harbour $13', 836, 730, 10.5, '#fff7e6', 'center', false);
+  text(ctx, 'Prawn $14', 836, 747, 10.5, '#fff7e6', 'center', false);
   // Two fish crates stacked against the right counter by the serve window, the
   // morning's catch still in the top one.
   const crate = (x, y, w, h) => {
@@ -1029,6 +1064,33 @@ function drawKitchen(ctx, state) {
       for (const sx of [station.x + 136, station.x + 224]) {
         ctx.beginPath(); ctx.moveTo(sx, station.y + 33); ctx.lineTo(sx + 14, station.y + 57); ctx.stroke();
       }
+      // The board's two margins dressed with the tools of its work: lemon
+      // halves waiting on the left, the knife resting on the right — drawn
+      // with the board, under whatever rests on it, and clear of the tray's
+      // span, so the surface reads as worked, not a plank with a tenant.
+      for (const [lx, ly, lr] of [[station.x + 127, station.y + 40, 6.5], [station.x + 137, station.y + 51, 5.5]]) {
+        ctx.fillStyle = '#f7c948';
+        ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fbe38a';
+        ctx.beginPath(); ctx.arc(lx, ly, lr * 0.68, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(201,150,53,0.8)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(lx - lr * 0.6, ly); ctx.lineTo(lx + lr * 0.6, ly); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(lx, ly - lr * 0.6); ctx.lineTo(lx, ly + lr * 0.6); ctx.stroke();
+      }
+      ctx.save();
+      ctx.translate(station.x + 248, station.y + 45);
+      ctx.rotate(1.0);
+      ctx.scale(0.66, 0.66);
+      ctx.fillStyle = COLORS.steel;
+      ctx.beginPath();
+      ctx.moveTo(-23, -3.4); ctx.lineTo(8, -3.4); ctx.lineTo(12.5, 0); ctx.lineTo(8, 3); ctx.lineTo(-23, 3);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#eef3f4';
+      ctx.fillRect(-23, 1.1, 33, 1.6);
+      ctx.fillStyle = '#5d4030';
+      rr(ctx, 12, -3.4, 13.5, 6.8, 3); ctx.fill();
+      ctx.restore();
       // A dressed resting plate at the left end: greens, tomato, a lemon wedge.
       // Drawn a step larger than it was — at 27 across, its dressing collapsed
       // into coloured dots on a white oval at contact-sheet size.
@@ -1098,16 +1160,16 @@ function drawKitchen(ctx, state) {
           const it = state.island.item;
           const ty = station.y + 46;
           ctx.fillStyle = 'rgba(74,44,16,0.20)';
-          ctx.beginPath(); ctx.ellipse(cx, ty + 6, 46, 11, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(cx, ty + 6, 49, 11, 0, 0, Math.PI * 2); ctx.fill();
           ctx.fillStyle = '#8d979d';
-          ctx.beginPath(); ctx.ellipse(cx, ty + 2, 45, 12.5, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(cx, ty + 2, 48, 12.5, 0, 0, Math.PI * 2); ctx.fill();
           ctx.fillStyle = '#c3ced3';
-          ctx.beginPath(); ctx.ellipse(cx, ty, 41, 10.5, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(cx, ty, 44, 10.5, 0, 0, Math.PI * 2); ctx.fill();
           const cols = it === 'prawns_raw' ? { body: '#e8ab90', line: '#bd7f63' }
             : it === 'prawns_grilled' ? { body: '#f4834f', line: '#c25227' }
             : { body: '#503a2c', line: '#2e2019' };
           const sheen = it !== 'prawns_burnt';
-          for (const [ox, oy, rot, sc] of [[-23, 1, 0.35, 0.92], [1, -3, 2.45, 0.85], [24, 1, -0.85, 0.9]]) {
+          for (const [ox, oy, rot, sc] of [[-25, 1, 0.35, 1.03], [1, -3, 2.45, 0.96], [26, 1, -0.85, 1.0]]) {
             ctx.save();
             ctx.translate(cx + ox, ty + oy);
             ctx.scale(sc, sc);
@@ -1248,8 +1310,14 @@ function drawKitchen(ctx, state) {
   // feels like evening service instead of a bare floor with a table on it.
   // The rail is carried on two iron uprights from the back counter's edge —
   // at its old span it floated over the floor, supported by nothing.
-  ctx.fillStyle = 'rgba(255,205,120,0.07)';
+  // The pool is drawn to be seen: at its old 0.07 the lamps lit nothing and
+  // the middle band stayed bare tone. Two flat pools now — a wide one over
+  // the rug's ground, a tighter warmer one over the island itself — still
+  // quieter than anything that carries information.
+  ctx.fillStyle = 'rgba(255,205,120,0.12)';
   ctx.beginPath(); ctx.ellipse(640, 460, 232, 80, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,205,120,0.08)';
+  ctx.beginPath(); ctx.ellipse(640, 460, 168, 56, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#2b2320';
   for (const ux of [470, 810]) ctx.fillRect(ux - 2.5, 226, 5, 24);
   ctx.fillStyle = '#4a3b2a';
@@ -1453,6 +1521,16 @@ function drawBoard(ctx, state) {
       text(ctx, `${line.done ? '✓' : '•'} ${DISHES[line.dish].name} $${DISHES[line.dish].price}`, x + 70, lineY, 12, line.done ? COLORS.teal : '#6b5a44', 'left', false);
       lineY += 14.5;
     }
+    if (ticket.items.length === 1 && DISHES[main.dish].items) {
+      // A one-dish card has a dead band under its single line, and the line
+      // itself only repeats the title. Fill the band with what the dish is
+      // made of — the fetching route the game is about, in short piece
+      // names — so the board carries the depth, not an echo. Combo cards
+      // already fill both of their lines and keep them.
+      const shortPiece = (item) => (item === 'bun' ? 'roll' : item.replace('_grilled', '').replace('_cut', ''));
+      const parts = DISHES[main.dish].items.map(shortPiece).join(' · ');
+      text(ctx, parts, x + 70, lineY, 11, '#8a755a', 'left', false);
+    }
     // The bottom row: what the ticket pays on the left, the seconds left on the right.
     text(ctx, `$${ticket.price} + tip`, x + 10, y + h - 21, 12.5, COLORS.tealDark, 'left');
     text(ctx, `${Math.ceil(ticket.timeLeft)}s`, x + cardW - 8, y + h - 21, 11.5, frac <= 0.25 ? COLORS.red : '#6b5a44', 'right');
@@ -1475,13 +1553,19 @@ function drawBoard(ctx, state) {
   if (state.tickets.length === 0 && state.phase === 'play') {
     text(ctx, 'No orders — breathe. The rush is coming…', 20, 62, 16, '#9fb4ac', 'left', false);
   }
-  // HUD on the right of the board.
+  // HUD on the right of the board. Money is written the same way everywhere
+  // in the game — tickets and popups say "$13" and "+$16", so the board says
+  // "$86", never "$ 86". And the readouts only exist once a shift does: on
+  // the title screen there is no score, no clock and no served count to
+  // report, so the board band wears just its ORDERS label there.
   const hx = 1152;
-  text(ctx, `$ ${state.score}`, hx, 34, 25, '#ffd968', 'left');
-  const mm = Math.floor(Math.max(0, state.shiftLeft) / 60);
-  const ss = Math.floor(Math.max(0, state.shiftLeft) % 60);
-  text(ctx, `SHIFT ${mm}:${String(ss).padStart(2, '0')}`, hx, 66, 15.5, state.shiftLeft <= 20 && state.phase === 'play' ? '#ff8a75' : COLORS.cream, 'left');
-  text(ctx, `SERVED ${state.served}`, hx, 90, 13, '#9fb4ac', 'left', false);
+  if (state.phase !== 'title') {
+    text(ctx, `$${state.score}`, hx, 34, 25, '#ffd968', 'left');
+    const mm = Math.floor(Math.max(0, state.shiftLeft) / 60);
+    const ss = Math.floor(Math.max(0, state.shiftLeft) % 60);
+    text(ctx, `SHIFT ${mm}:${String(ss).padStart(2, '0')}`, hx, 66, 15.5, state.shiftLeft <= 20 && state.phase === 'play' ? '#ff8a75' : COLORS.cream, 'left');
+    text(ctx, `SERVED ${state.served}`, hx, 90, 13, '#9fb4ac', 'left', false);
+  }
 }
 
 /** A chalkboard panel in the specials board's own style: wood frame, dark green board. */
@@ -1539,19 +1623,29 @@ function drawOverlays(ctx, state) {
     text(ctx, 'PRESS ENTER — FIRST SHIFT', cx, 660, 20, '#7dff9a');
   } else {
     text(ctx, 'LAST ORDERS — SHIFT OVER', cx, 184, 44, '#ffd968');
-    text(ctx, `You took $ ${state.score}`, cx, 238, 29, COLORS.cream);
+    text(ctx, `You took $${state.score}`, cx, 238, 29, COLORS.cream);
     // The shift's story, dish by dish: what actually went out of the kitchen,
     // counted line by line as it was served.
-    chalkPanel(ctx, 290, 264, 700, 196);
+    // The panel is narrowed about the centre (290 → 345, centre still 640):
+    // at its old width its left edge sliced through the captured cook, who
+    // stands at x≈301 with a body spanning roughly x270–334 — and his
+    // position is the run's own data, so the panel moves, never he does.
+    chalkPanel(ctx, 345, 264, 590, 196);
     text(ctx, 'SERVED THIS SHIFT', cx, 288, 13.5, '#9fb4ac');
-    [...RECIPES, FRIES].forEach((dish, i) => {
-      const colX = i < 3 ? 480 : 800;
-      const y = 326 + (i % 3) * 42;
-      const n = state.servedBy[dish.id] || 0;
+    // The lines read in the order the shift happened, strongest first
+    // (ties in menu order): the counts are the capture's own and none
+    // changes, but the two ×0 lines fall to the last row together instead
+    // of sitting mid-panel where the eye lands after the ×5.
+    const servedList = [...RECIPES, FRIES]
+      .map((dish, order) => ({ dish, n: state.servedBy[dish.id] || 0, order }))
+      .sort((a, b) => b.n - a.n || a.order - b.order);
+    servedList.forEach(({ dish, n }, i) => {
+      const colX = i % 2 === 0 ? 480 : 800;
+      const y = 326 + Math.floor(i / 2) * 42;
       drawDish(ctx, dish.id, colX - 82, y, 40);
       text(ctx, `${dish.name} ×${n}`, colX - 56, y, 15.5, n > 0 ? COLORS.cream : '#71827a', 'left', false);
     });
-    text(ctx, `Dishes served ${state.served}      Walkouts ${state.walkouts}      Best tip $ ${state.bestTip}`, cx, 490, 17.5, '#cfe0d8', 'center', false);
+    text(ctx, `Dishes served ${state.served}      Walkouts ${state.walkouts}      Best tip $${state.bestTip}`, cx, 490, 17.5, '#cfe0d8', 'center', false);
     const [letter, title] = gradeFor(state.score);
     text(ctx, `KITCHEN GRADE: ${letter} — ${title}`, cx, 532, 22, COLORS.mustard);
     text(ctx, 'PRESS R TO WORK ANOTHER SHIFT', cx, 578, 17, '#7dff9a');
