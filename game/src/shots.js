@@ -27,6 +27,7 @@ function cover() {
   s.boards[0].item = 'tomato';
   s.boards[0].chops = 2; // mid-chop, one press from done
   s.plate = ['fillet_grilled', 'lettuce_cut']; // a Harbour Plate mid-assembly
+  s.island.item = 'prawns_grilled'; // grilled prawns resting on the island, mid-route
   s.passDish = 'fillet'; // a finished plate resting on the pass
   s.passT = 1.6;
   s.chef.x = 560;
@@ -41,7 +42,7 @@ function title() {
   const s = createGame(7);
   s.phase = 'title';
   s.chef.x = 640;
-  s.chef.y = 470;
+  s.chef.y = 596;
   return s;
 }
 
@@ -67,6 +68,7 @@ function rush() {
   s.boards[0].item = 'potato';
   s.boards[0].chops = 1;
   s.plate = ['bun'];
+  s.island.item = 'fillet_grilled'; // a fillet resting on the island, waiting its plate
   s.passDish = 'salad';
   s.passT = 1.2;
   s.chef.x = 1006;
@@ -89,7 +91,7 @@ function end() {
   s.bestTip = 9;
   s.shiftLeft = 0;
   s.chef.x = 640;
-  s.chef.y = 470;
+  s.chef.y = 596;
   return s;
 }
 

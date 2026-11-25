@@ -119,6 +119,17 @@ export function interact(state) {
     return;
   }
 
+  if (station.kind === 'island') {
+    // The resting island is a spare pair of hands: set down, pick up, or swap what
+    // rests there. It cooks nothing and asks for nothing — it never becomes a chore.
+    const resting = state.island.item;
+    if (!resting && !held) return refuse(state, station, 'Nothing to rest — the island holds work-in-progress');
+    state.island.item = held || null;
+    chef.carry = resting || null;
+    sfx.place();
+    return;
+  }
+
   if (station.kind === 'plating') {
     if (held) {
       if (isDish(held)) return refuse(state, station, 'That dish is done — take it to SERVE');
@@ -174,6 +185,7 @@ export function promptFor(state) {
       return finished ? `SPACE: pick up the ${finished.name}` : 'SPACE: the plate builds a dish';
     }
     case 'serve': return 'SPACE: serve the dish you carry';
+    case 'island': return held ? 'SPACE: rest it on the island' : state.island.item ? 'SPACE: pick up what rests here' : 'The island rests work-in-progress';
     case 'trash': return 'SPACE: throw away what you hold / clear the plate';
     default: return '';
   }

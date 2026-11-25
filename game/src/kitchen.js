@@ -14,9 +14,10 @@ export function createGame(seed) {
     served: 0,
     walkouts: 0,
     bestTip: 0,
-    chef: { x: 640, y: 470, face: 1, carry: null, walk: 0 },
+    chef: { x: 640, y: 596, face: 1, carry: null, walk: 0 },
     grill: { item: null, t: 0 },
     fryer: { item: null, t: 0 },
+    island: { item: null }, // one piece resting mid-route on the island
     boards: [
       { station: stationById('board-1'), item: null, chops: 0 },
       { station: stationById('board-2'), item: null, chops: 0 },

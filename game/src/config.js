@@ -44,12 +44,16 @@ export const COLORS = {
   timerGood: '#57a773',
   timerMid: '#f2b33d',
   timerBad: '#d84a2f',
+  rug: '#b85c38',
+  rugStripe: '#e5aa5e',
+  driftwood: '#9c815e',
 };
 
 /**
  * The fixed furniture. Bins sit in a row on the back counter; the grill shares that counter.
  * Chopping boards line the left counter, the fryer the right, and the front counter holds
- * the trash, the plating pass and the serve window, left to right.
+ * the trash, the plating pass and the serve window, left to right. Mid-floor stands the
+ * resting island: a spare surface where work-in-progress can be set down, nothing more.
  */
 export const STATIONS = [
   { id: 'bin-bun', kind: 'bin', item: 'bun', label: 'ROLLS', x: 36, y: 146, w: 150, h: 70 },
@@ -62,16 +66,18 @@ export const STATIONS = [
   { id: 'board-1', kind: 'board', label: 'CHOP', x: 30, y: 282, w: 150, h: 108 },
   { id: 'board-2', kind: 'board', label: 'CHOP', x: 30, y: 406, w: 150, h: 108 },
   { id: 'fryer', kind: 'fryer', label: 'FRYER', x: 1100, y: 282, w: 150, h: 108 },
+  { id: 'island', kind: 'island', label: 'RESTING ISLAND', x: 490, y: 420, w: 300, h: 84 },
   { id: 'trash', kind: 'trash', label: 'BIN', x: 36, y: 690, w: 120, h: 76 },
   { id: 'plating', kind: 'plating', label: 'PLATING', x: 330, y: 690, w: 460, h: 76 },
   { id: 'serve', kind: 'serve', label: 'SERVE', x: 880, y: 690, w: 364, h: 76 },
 ];
 
-/** Solid blocks the chef cannot walk through: the four counters and a dresser of plates. */
+/** Solid blocks the chef cannot walk through: the four counters and the island. */
 export const SOLIDS = [
   { x: 20, y: 130, w: 1240, h: 96 },
   { x: 20, y: 272, w: 170, h: 264 },
   { x: 1090, y: 272, w: 170, h: 264 },
+  { x: 480, y: 410, w: 320, h: 104 },
   { x: 20, y: 676, w: 1240, h: 104 },
 ];
 

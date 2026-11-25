@@ -3,7 +3,7 @@
 // Nothing here changes the game — it only reads the state and draws it.
 
 import { BOARD_H, COLORS, FRYER_BURN, FRYER_COOK, GRILL_BURN, GRILL_COOK, SOLIDS, STATIONS, VIEW } from './config.js';
-import { DISHES, COOKED, RECIPES } from './recipes.js';
+import { DISHES, COOKED, RECIPES, recipeForStack } from './recipes.js';
 import { nearestStation } from './actions.js';
 
 const FONT = "'Trebuchet MS', 'Segoe UI', Verdana, sans-serif";
@@ -19,6 +19,56 @@ function text(ctx, str, x, y, size, color, align = 'center', bold = true) {
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
   ctx.fillText(str, x, y);
+}
+
+/**
+ * One prawn, drawn to be recognised at thumbnail size: a curled, segmented body —
+ * fat at the head, slimming ring by ring to a fanned tail — with an eye and feelers.
+ * Centred on the origin, roughly 36 units wide before the caller's scale.
+ */
+function drawPrawn(ctx, colors, rot) {
+  ctx.save();
+  ctx.rotate(rot);
+  const segs = [];
+  for (let i = 0; i < 5; i++) {
+    const a = -2.05 + i * 0.62;
+    segs.push({ x: Math.cos(a) * 10.5, y: Math.sin(a) * 10.5 + 3, r: 6.4 - i * 0.72 });
+  }
+  // The tail fan, at the slim end of the curl.
+  const tail = segs[segs.length - 1];
+  ctx.fillStyle = colors.body;
+  ctx.strokeStyle = colors.line;
+  ctx.lineWidth = 1.1;
+  for (const f of [-0.45, 0.4]) {
+    ctx.save();
+    ctx.translate(tail.x, tail.y);
+    ctx.rotate(f + 0.9);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(9.5, -3.4); ctx.lineTo(9.5, 3.4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  // The segments, tail first so the head sits on top.
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const s = segs[i];
+    ctx.fillStyle = colors.body;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = colors.line;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, -0.5, 2.1); ctx.stroke();
+  }
+  // The head: one dark eye and two long feelers sweeping back.
+  const head = segs[0];
+  ctx.fillStyle = '#2b2320';
+  ctx.beginPath(); ctx.arc(head.x - 3.2, head.y - 2.8, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = colors.line;
+  ctx.lineWidth = 1.2;
+  ctx.lineCap = 'round';
+  for (const f of [-0.5, -1.0]) {
+    ctx.beginPath();
+    ctx.moveTo(head.x - 4, head.y - 3);
+    ctx.quadraticCurveTo(head.x - 11, head.y - 6 + f * 4, head.x - 15, head.y - 3 + f * 9);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /** One ingredient, centred on (x, y), roughly s px across. Used by bins, hands and boards. */
@@ -60,13 +110,13 @@ export function drawItem(ctx, item, x, y, s) {
     case 'prawns_raw':
     case 'prawns_grilled':
     case 'prawns_burnt': {
-      const shell = item === 'prawns_raw' ? '#cbb3ab' : item === 'prawns_grilled' ? '#ef8354' : '#3a2a20';
-      ctx.strokeStyle = shell;
-      ctx.lineWidth = 4.4;
-      ctx.lineCap = 'round';
-      for (const [ox, oy, a0] of [[-9, 4, 0.4], [2, -5, 2.4], [10, 6, 4.2]]) {
-        ctx.beginPath(); ctx.arc(ox, oy, 5.4, a0, a0 + 4.2); ctx.stroke();
-      }
+      // A little pile of proper prawns, not curls: segmented, fanned, feelers out.
+      const colors = item === 'prawns_raw' ? { body: '#e8ab90', line: '#bd7f63' }
+        : item === 'prawns_grilled' ? { body: '#f4834f', line: '#c25227' }
+        : { body: '#503a2c', line: '#2e2019' };
+      drawPrawn(ctx, colors, 0.25);
+      ctx.save(); ctx.translate(9, 8); ctx.scale(0.82, 0.82); drawPrawn(ctx, colors, 2.5); ctx.restore();
+      ctx.save(); ctx.translate(-9, 9); ctx.scale(0.7, 0.7); drawPrawn(ctx, colors, -0.9); ctx.restore();
       break;
     }
     case 'tomato':
@@ -183,6 +233,35 @@ export function drawPlate(ctx, items, x, y, s) {
   ctx.restore();
 }
 
+/**
+ * A plate still being built, for the plating counter only: the pieces sit side by
+ * side instead of stacked, so what is already on reads at a glance — and one dashed
+ * ring marks the empty place where the next piece belongs.
+ */
+function drawPlateSpread(ctx, items, x, y, s) {
+  const u = s / 110;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(u, u);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.ellipse(0, 10, 52, 17, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#dfe5e8';
+  ctx.beginPath(); ctx.ellipse(0, 9, 42, 12, 0, 0, Math.PI * 2); ctx.fill();
+  const slots = items.length >= 3 ? [[-27, 2], [0, -5], [27, 2]]
+    : items.length === 2 ? [[-25, 0], [25, 0]]
+    : [[-14, 0]];
+  items.forEach((item, i) => drawItem(ctx, item, slots[i][0], slots[i][1], 40));
+  if (items.length < 3) {
+    const gap = items.length === 2 ? [0, 12] : [24, 2];
+    ctx.strokeStyle = 'rgba(20,84,75,0.8)';
+    ctx.lineWidth = 2.2;
+    ctx.setLineDash([4.5, 3.5]);
+    ctx.beginPath(); ctx.arc(gap[0], gap[1], 13.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
 /** The icon for a whole dish: a plate stack for recipes, the carton for fries. */
 export function drawDish(ctx, dishId, x, y, s) {
   if (dishId === 'fries') {
@@ -218,6 +297,114 @@ function drawProgress(ctx, x, y, w, frac, color) {
   }
 }
 
+/**
+ * A call on a solid pill badge — READY!, BURNT!, CUT! — drawn after everything else
+ * on its station, so no food or steam can ever hide it, and big enough to read on
+ * the contact sheet.
+ */
+function drawBadge(ctx, x, y, label, bg) {
+  ctx.font = `700 13.5px ${FONT}`;
+  const w = Math.max(62, ctx.measureText(label).width + 24);
+  ctx.fillStyle = bg;
+  rr(ctx, x - w / 2, y - 11.5, w, 23, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = 1.6;
+  rr(ctx, x - w / 2, y - 11.5, w, 23, 7); ctx.stroke();
+  text(ctx, label, x, y + 0.5, 13.5, '#ffffff');
+}
+
+/** A woven floor runner: terracotta ground, pale stripes, a light border. */
+function drawRug(ctx, x, y, w, h) {
+  ctx.fillStyle = COLORS.rug;
+  rr(ctx, x, y, w, h, 6); ctx.fill();
+  ctx.strokeStyle = COLORS.rugStripe;
+  ctx.lineWidth = 3;
+  for (let sx = x + 16; sx < x + w - 8; sx += 36) {
+    ctx.beginPath(); ctx.moveTo(sx, y + 4); ctx.lineTo(sx, y + h - 4); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(255,247,230,0.55)';
+  ctx.lineWidth = 1.4;
+  rr(ctx, x + 3, y + 3, w - 6, h - 6, 4); ctx.stroke();
+}
+
+/**
+ * An ingredient caught part-way through the knife: some pieces already cut and
+ * fanned aside, the rest still whole with a flat cut face — and the knife itself,
+ * blade down over the work. Drawn in drawItem's 40-unit box.
+ */
+function drawMidChop(ctx, item, chops, x, y, s) {
+  const u = s / 40;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(u, u);
+  if (item === 'tomato') {
+    // Slices already off, fanned to the left.
+    for (let i = 0; i < chops; i++) {
+      const ox = -14 + i * 7.5;
+      const oy = 7 - i * 2;
+      ctx.fillStyle = '#d8402a';
+      ctx.beginPath(); ctx.arc(ox, oy, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f0927c';
+      ctx.beginPath(); ctx.arc(ox, oy, 4.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d8402a';
+      ctx.beginPath(); ctx.arc(ox, oy, 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+    // The remaining half, dome up, cut face showing.
+    ctx.fillStyle = '#d8402a';
+    ctx.beginPath(); ctx.arc(10, 4, 11, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#f0927c';
+    ctx.beginPath(); ctx.ellipse(10, 4, 11, 3.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#d8402a';
+    for (const [sx, sy] of [[4, 4], [10, 5.4], [16, 4]]) {
+      ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#4d8f3a';
+    ctx.beginPath(); ctx.ellipse(10, -8.5, 5, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+  } else if (item === 'potato') {
+    // Sticks already cut, standing to the left; the rest of the potato beside them.
+    ctx.fillStyle = '#ecd28e';
+    for (let i = 0; i < chops; i++) {
+      ctx.save();
+      ctx.translate(-13 + i * 6.5, 1);
+      ctx.rotate(-0.1 + i * 0.09);
+      rr(ctx, -2.6, -12, 5.2, 24, 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = '#cfa15f';
+    ctx.beginPath(); ctx.ellipse(10, 1, 15 - chops * 2.4, 10.5, 0.25, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ecd28e';
+    ctx.beginPath(); ctx.ellipse(1.5, 0, 3, 8.4, 0.25, 0, Math.PI * 2); ctx.fill();
+  } else if (item === 'lettuce') {
+    // A growing pile of shreds, and the leaf it came from, shrinking.
+    ctx.strokeStyle = '#5da24a';
+    ctx.lineWidth = 3.6;
+    ctx.lineCap = 'round';
+    const strokes = [[-15, 5, -6, -4], [-8, 8, 3, -2], [-12, -3, -3, 6], [-4, 4, 6, -5]];
+    for (let i = 0; i < chops * 2 && i < strokes.length; i++) {
+      const [x1, y1, x2, y2] = strokes[i];
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    ctx.fillStyle = '#6db457';
+    ctx.beginPath(); ctx.arc(11, 0, 11 - chops * 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8fce7d';
+    ctx.beginPath(); ctx.arc(8, -3, Math.max(2.5, 6 - chops * 1.6), 0, Math.PI * 2); ctx.fill();
+  }
+  // The knife, caught mid-work above the board: long blade, dark handle.
+  ctx.save();
+  ctx.translate(15, -13);
+  ctx.rotate(-0.62);
+  ctx.fillStyle = COLORS.steel;
+  ctx.beginPath();
+  ctx.moveTo(-23, -3.4); ctx.lineTo(8, -3.4); ctx.lineTo(12.5, 0); ctx.lineTo(8, 3); ctx.lineTo(-23, 3);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#eef3f4';
+  ctx.fillRect(-23, 1.1, 33, 1.6);
+  ctx.fillStyle = '#5d4030';
+  rr(ctx, 12, -3.4, 13.5, 6.8, 3); ctx.fill();
+  ctx.restore();
+  ctx.restore();
+}
+
 function drawMachine(ctx, state, station, machine) {
   const kind = station.kind;
   const cookAt = kind === 'grill' ? GRILL_COOK : FRYER_COOK;
@@ -234,11 +421,6 @@ function drawMachine(ctx, state, station, machine) {
     drawItem(ctx, shown, cx, cy - 4, kind === 'grill' ? 54 : 52);
     const color = machine.t >= burnAt ? COLORS.red : machine.t >= cookAt ? COLORS.timerGood : COLORS.mustard;
     drawProgress(ctx, station.x + 16, station.y + station.h - 20, station.w - 32, machine.t / burnAt, color);
-    if (machine.t >= cookAt && machine.t < burnAt) {
-      text(ctx, 'READY!', cx, station.y + 16, 13, '#7dff9a');
-    } else if (machine.t >= burnAt) {
-      text(ctx, 'BURNT!', cx, station.y + 16, 13, '#ff8a75');
-    }
     // A curl of steam, swaying with the clock so the frame feels alive.
     ctx.strokeStyle = 'rgba(255,255,255,0.55)';
     ctx.lineWidth = 2.4;
@@ -249,21 +431,42 @@ function drawMachine(ctx, state, station, machine) {
       ctx.quadraticCurveTo(sx + 5, cy - 38, sx, cy - 48);
       ctx.stroke();
     }
+    // The call, on a solid badge drawn last of all, so neither the food nor the
+    // steam can hide it: green READY!, red BURNT!.
+    if (machine.t >= burnAt) drawBadge(ctx, cx, station.y + 17, 'BURNT!', '#a93420');
+    else if (machine.t >= cookAt) drawBadge(ctx, cx, station.y + 17, 'READY!', '#1e7d46');
   }
   text(ctx, station.label, cx, station.y + station.h - 8 + 6, 12, '#22382e');
 }
 
 function drawKitchen(ctx, state) {
-  // Floor tiles.
+  // The floor: sea-washed deck planks laid across the room, butt joints staggered.
   ctx.fillStyle = COLORS.floor;
   ctx.fillRect(0, BOARD_H, VIEW.width, VIEW.height - BOARD_H);
-  ctx.strokeStyle = COLORS.floorLine;
-  ctx.lineWidth = 1;
-  for (let x = 0; x <= VIEW.width; x += 64) {
-    ctx.beginPath(); ctx.moveTo(x, BOARD_H); ctx.lineTo(x, VIEW.height); ctx.stroke();
+  const plankH = 32;
+  for (let row = 0, y = BOARD_H; y < VIEW.height; row++, y += plankH) {
+    if (row % 2) {
+      ctx.fillStyle = 'rgba(31,122,109,0.05)';
+      ctx.fillRect(0, y, VIEW.width, plankH);
+    }
+    ctx.strokeStyle = COLORS.floorLine;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(0, y + plankH); ctx.lineTo(VIEW.width, y + plankH); ctx.stroke();
+    ctx.lineWidth = 1;
+    for (let x = ((row * 397) % 640) + 180; x < VIEW.width; x += 640) {
+      ctx.beginPath(); ctx.moveTo(x, y + 3); ctx.lineTo(x, y + plankH - 3); ctx.stroke();
+    }
   }
-  for (let y = BOARD_H; y <= VIEW.height; y += 64) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(VIEW.width, y); ctx.stroke();
+  // Woven runners where the cook wears the floor: before the back counter, before the pass.
+  drawRug(ctx, 60, 240, 1160, 30);
+  drawRug(ctx, 210, 622, 860, 34);
+  // A round braided rug under the island, ringed in the room's colours.
+  ctx.fillStyle = COLORS.rug;
+  ctx.beginPath(); ctx.ellipse(640, 462, 198, 72, 0, 0, Math.PI * 2); ctx.fill();
+  for (const [rx, ry, col, wdt] of [[178, 62, COLORS.rugStripe, 5], [152, 51, COLORS.teal, 4], [126, 41, COLORS.rugStripe, 4]]) {
+    ctx.strokeStyle = col;
+    ctx.lineWidth = wdt;
+    ctx.beginPath(); ctx.ellipse(640, 462, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
   }
   // Counters.
   for (const solid of SOLIDS) {
@@ -287,6 +490,40 @@ function drawKitchen(ctx, state) {
     ctx.beginPath(); ctx.arc(1208, 492, 13, a, a + 0.7); ctx.stroke();
   }
   text(ctx, 'PANTRY', 1175, 424, 11, COLORS.ink);
+  // Two portholes in the front of the pass, looking out at the harbour: brass rims,
+  // a strip of sky, the sea, and one small boat going about its business.
+  for (const px of [206, 282]) {
+    ctx.fillStyle = '#c99635';
+    ctx.beginPath(); ctx.arc(px, 728, 21, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.beginPath(); ctx.arc(px, 728, 16.5, 0, Math.PI * 2); ctx.clip();
+    ctx.fillStyle = '#8fc3d4';
+    ctx.fillRect(px - 17, 711, 34, 13);
+    ctx.fillStyle = '#5b93a8';
+    ctx.fillRect(px - 17, 724, 34, 21);
+    ctx.fillStyle = '#274b52';
+    ctx.beginPath();
+    ctx.moveTo(px - 8, 727); ctx.lineTo(px + 8, 727); ctx.lineTo(px + 5, 731); ctx.lineTo(px - 5, 731);
+    ctx.closePath(); ctx.fill();
+    ctx.fillRect(px - 0.8, 718, 1.6, 9);
+    ctx.fillStyle = '#fff7e6';
+    ctx.beginPath(); ctx.moveTo(px + 1.6, 719); ctx.lineTo(px + 1.6, 726); ctx.lineTo(px + 7.5, 726); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#8a6a24';
+    for (const a of [0.78, 2.36, 3.93, 5.5]) {
+      ctx.beginPath(); ctx.arc(px + Math.cos(a) * 18.6, 728 + Math.sin(a) * 18.6, 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  // The specials board, chalked on the pass between plating and serve.
+  ctx.fillStyle = '#22382e';
+  rr(ctx, 796, 694, 80, 66, 4); ctx.fill();
+  ctx.strokeStyle = '#5f4f3c';
+  ctx.lineWidth = 3;
+  rr(ctx, 796, 694, 80, 66, 4); ctx.stroke();
+  text(ctx, 'SPECIALS', 836, 707, 10.5, '#ffd968');
+  text(ctx, 'Harbour', 836, 725, 10.5, '#fff7e6', 'center', false);
+  text(ctx, 'Plate $13', 836, 740, 10.5, '#fff7e6', 'center', false);
+  text(ctx, 'Prawn $14', 836, 752, 10.5, '#9fb4ac', 'center', false);
 
   const active = nearestStation(state);
   for (const station of STATIONS) {
@@ -301,27 +538,47 @@ function drawKitchen(ctx, state) {
       drawMachine(ctx, state, station, state.grill);
     } else if (station.kind === 'fryer') {
       drawMachine(ctx, state, station, state.fryer);
+    } else if (station.kind === 'island') {
+      // The resting island: a driftwood top over the sea-glass base, a herb trough
+      // along its back edge, and one rest mat where the work-in-progress sits.
+      ctx.fillStyle = COLORS.driftwood;
+      rr(ctx, station.x + 3, station.y + 3, station.w - 6, station.h - 6, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(95,79,60,0.55)';
+      ctx.lineWidth = 1.2;
+      for (const px of [station.x + 76, station.x + 150, station.x + 224]) {
+        ctx.beginPath(); ctx.moveTo(px, station.y + 6); ctx.lineTo(px, station.y + station.h - 6); ctx.stroke();
+      }
+      ctx.fillStyle = '#5f4f3c';
+      rr(ctx, station.x + 10, station.y + 7, station.w - 20, 13, 4); ctx.fill();
+      for (let hx = station.x + 22, i = 0; hx < station.x + station.w - 14; hx += 21, i++) {
+        ctx.fillStyle = i % 2 ? '#6db457' : '#5da24a';
+        ctx.beginPath(); ctx.arc(hx, station.y + 12, 6.2, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(31,122,109,0.32)';
+      rr(ctx, station.x + 72, station.y + 26, station.w - 144, station.h - 44, 8); ctx.fill();
+      if (state.island.item) {
+        if (DISHES[state.island.item]) drawDish(ctx, state.island.item, cx, station.y + 45, 60);
+        else drawItem(ctx, state.island.item, cx, station.y + 44, 46);
+      }
+      text(ctx, station.label, cx, station.y + station.h - 9, 12, '#22382e');
     } else if (station.kind === 'board') {
       const board = state.boards.find((b) => b.station === station);
       ctx.fillStyle = '#d9b77c';
       rr(ctx, station.x + 12, station.y + 12, station.w - 24, station.h - 34, 6); ctx.fill();
       if (board.item) {
-        drawItem(ctx, board.item, cx, station.y + 44, 52);
         const need = { tomato: 3, lettuce: 2, potato: 3 }[board.item];
+        if (need && board.chops >= need) {
+          // Done: what lies on the board is the cut pieces themselves.
+          drawItem(ctx, { tomato: 'tomato_cut', lettuce: 'lettuce_cut', potato: 'potato_cut' }[board.item], cx, station.y + 44, 52);
+        } else if (need && board.chops > 0) {
+          // Mid-job: part cut, part whole, the knife caught in the work.
+          drawMidChop(ctx, board.item, board.chops, cx, station.y + 44, 52);
+        } else {
+          drawItem(ctx, board.item, cx, station.y + 44, 52);
+        }
         if (need) {
           drawProgress(ctx, station.x + 18, station.y + station.h - 30, station.w - 36, board.chops / need, COLORS.teal);
-          if (board.chops >= need) text(ctx, 'CUT!', cx, station.y + 16, 13, COLORS.tealDark);
-          else if (board.chops > 0) {
-            // The knife rests mid-job, blade down on the board.
-            ctx.save();
-            ctx.translate(cx + 34, station.y + 30);
-            ctx.rotate(0.7);
-            ctx.fillStyle = COLORS.steel;
-            rr(ctx, -3, -16, 6, 22, 2); ctx.fill();
-            ctx.fillStyle = '#5d4030';
-            rr(ctx, -3, 5, 6, 13, 2); ctx.fill();
-            ctx.restore();
-          }
+          if (board.chops >= need) drawBadge(ctx, cx, station.y + 16, 'CUT!', COLORS.tealDark);
         }
       }
       text(ctx, station.label, cx, station.y + station.h - 9, 12, '#22382e');
@@ -333,8 +590,23 @@ function drawKitchen(ctx, state) {
       text(ctx, 'BIN', cx, station.y + station.h - 8, 12, '#22382e');
     } else if (station.kind === 'plating') {
       text(ctx, 'PLATING — build the dish here', cx, station.y + 15, 13, '#22382e');
+      // Basil pots at the two corners of the pass.
+      for (const px of [station.x + 26, station.x + station.w - 26]) {
+        ctx.fillStyle = '#b85c38';
+        ctx.beginPath();
+        ctx.moveTo(px - 8, station.y + 36); ctx.lineTo(px + 8, station.y + 36);
+        ctx.lineTo(px + 5.5, station.y + 52); ctx.lineTo(px - 5.5, station.y + 52);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#5da24a';
+        for (const [ox, oy] of [[-5, 32], [0, 27], [5, 32]]) {
+          ctx.beginPath(); ctx.arc(px + ox, station.y + oy, 4.6, 0, Math.PI * 2); ctx.fill();
+        }
+      }
       if (state.plate.length) {
-        drawPlate(ctx, state.plate, cx, station.y + 44, 92);
+        // A finished plate stacks up as a dish; one still being built spreads its
+        // pieces out, with a dashed ring where the missing piece belongs.
+        if (recipeForStack(state.plate)) drawPlate(ctx, state.plate, cx, station.y + 44, 92);
+        else drawPlateSpread(ctx, state.plate, cx, station.y + 46, 112);
       } else {
         ctx.fillStyle = '#ffffff';
         ctx.beginPath(); ctx.ellipse(cx, station.y + 52, 42, 13, 0, 0, Math.PI * 2); ctx.fill();
@@ -362,34 +634,66 @@ function drawKitchen(ctx, state) {
 
 function drawChef(ctx, state) {
   const chef = state.chef;
-  const bob = Math.sin(chef.walk) * 2.2;
+  const bob = Math.sin(chef.walk) * 2.4;
   const x = chef.x;
   const y = chef.y + bob * 0.3;
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
-  ctx.beginPath(); ctx.ellipse(x, chef.y + 22, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
-  // Apron body — harbour indigo.
+  ctx.beginPath(); ctx.ellipse(x, chef.y + 27, 26, 7.5, 0, 0, Math.PI * 2); ctx.fill();
+  // Arms: both up under whatever he carries, or resting at his sides.
+  ctx.strokeStyle = '#f0bd8f';
+  ctx.lineWidth = 6.5;
+  ctx.lineCap = 'round';
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    if (chef.carry) {
+      ctx.moveTo(x + side * 20, y + 8);
+      ctx.lineTo(x + side * 12, y - 40);
+    } else {
+      ctx.moveTo(x + side * 23, y + 2);
+      ctx.lineTo(x + side * 27, y + 16);
+    }
+    ctx.stroke();
+  }
+  // Apron body — harbour indigo, a cream apron front with a pocket.
   ctx.fillStyle = '#2c4a7c';
-  ctx.beginPath(); ctx.arc(x, y + 4, 20, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y + 6, 25, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#f7f2e6';
-  rr(ctx, x - 11, y - 2 + bob * 0.2, 22, 18, 5); ctx.fill();
-  // Head and hat.
+  rr(ctx, x - 13.5, y - 1 + bob * 0.2, 27, 23, 6); ctx.fill();
+  ctx.strokeStyle = '#d8cfb8';
+  ctx.lineWidth = 1.4;
+  rr(ctx, x + 2, y + 10 + bob * 0.2, 9, 8, 2); ctx.stroke();
+  // Head and face.
   ctx.fillStyle = '#f0bd8f';
-  ctx.beginPath(); ctx.arc(x, y - 18 + bob * 0.2, 12.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y - 21 + bob * 0.2, 15.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2b2320';
+  for (const side of [-1, 1]) {
+    ctx.beginPath(); ctx.arc(x + side * 5.6, y - 22 + bob * 0.2, 1.7, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.strokeStyle = '#a96a3f';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(x, y - 17.5 + bob * 0.2, 5.6, 0.25, Math.PI - 0.25); ctx.stroke();
+  ctx.fillStyle = 'rgba(216,74,47,0.32)';
+  for (const side of [-1, 1]) {
+    ctx.beginPath(); ctx.arc(x + side * 10.5, y - 17 + bob * 0.2, 2.8, 0, Math.PI * 2); ctx.fill();
+  }
+  // A tall toque: band, dome and two side puffs.
   ctx.fillStyle = '#ffffff';
-  rr(ctx, x - 13, y - 33 + bob * 0.2, 26, 9, 4); ctx.fill();
-  ctx.beginPath(); ctx.arc(x, y - 33 + bob * 0.2, 9, 0, Math.PI * 2); ctx.fill();
-  // Scarf on the facing side.
+  rr(ctx, x - 14.5, y - 40 + bob * 0.2, 29, 8.5, 4); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y - 41 + bob * 0.2, 11.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x - 8, y - 39 + bob * 0.2, 7.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 8, y - 39 + bob * 0.2, 7.5, 0, Math.PI * 2); ctx.fill();
+  // Neckerchief, knotted on the facing side.
   ctx.fillStyle = COLORS.red;
   ctx.beginPath();
-  ctx.moveTo(x + chef.face * 8, y - 8);
-  ctx.lineTo(x + chef.face * 19, y - 3);
-  ctx.lineTo(x + chef.face * 8, y + 2);
+  ctx.moveTo(x - 7, y - 9);
+  ctx.lineTo(x + chef.face * 13, y - 4);
+  ctx.lineTo(x - 2, y + 1);
   ctx.closePath(); ctx.fill();
   // Whatever the chef carries rides overhead, both hands up.
   if (chef.carry) {
     const dish = DISHES[chef.carry];
-    if (dish) drawDish(ctx, chef.carry, x, y - 52, 62);
-    else drawItem(ctx, chef.carry, x, y - 50, 42);
+    if (dish) drawDish(ctx, chef.carry, x, y - 62, 66);
+    else drawItem(ctx, chef.carry, x, y - 60, 46);
   }
 }
 
@@ -414,28 +718,30 @@ function drawBoard(ctx, state) {
       rr(ctx, x, y, cardW, h, 7); ctx.stroke();
     }
     const main = ticket.items[0];
-    drawDish(ctx, main.dish, x + 40, y + 40, 62);
-    if (main.done) text(ctx, '✓', x + 40, y + 40, 30, COLORS.teal);
-    // The dish name shrinks to fit its share of the card, so it never meets the price.
+    drawDish(ctx, main.dish, x + 36, y + 33, 54);
+    if (main.done) text(ctx, '✓', x + 36, y + 33, 26, COLORS.teal);
+    // The dish name owns the top row and shrinks to fit it; the price no longer
+    // shares that row — it sits on the bottom row, so the two can never collide.
     let titleSize = 14.5;
     ctx.font = `700 ${titleSize}px ${FONT}`;
-    while (ctx.measureText(DISHES[main.dish].name).width > 104 && titleSize > 10.5) {
+    while (ctx.measureText(DISHES[main.dish].name).width > 132 && titleSize > 10.5) {
       titleSize -= 0.5;
       ctx.font = `700 ${titleSize}px ${FONT}`;
     }
-    text(ctx, DISHES[main.dish].name, x + 78, y + 22, titleSize, COLORS.ink, 'left');
-    let lineY = y + 42;
+    text(ctx, DISHES[main.dish].name, x + 70, y + 19, titleSize, COLORS.ink, 'left');
+    let lineY = y + 36;
     for (const line of ticket.items) {
-      text(ctx, `${line.done ? '✓' : '•'} ${DISHES[line.dish].name} $${DISHES[line.dish].price}`, x + 78, lineY, 12, line.done ? COLORS.teal : '#6b5a44', 'left', false);
-      lineY += 15;
+      text(ctx, `${line.done ? '✓' : '•'} ${DISHES[line.dish].name} $${DISHES[line.dish].price}`, x + 70, lineY, 12, line.done ? COLORS.teal : '#6b5a44', 'left', false);
+      lineY += 14.5;
     }
-    text(ctx, `$${ticket.price} + tip`, x + cardW - 8, y + 16, 12.5, COLORS.tealDark, 'right');
-    // The timer you can feel: a bar that drains and reddens.
+    // The bottom row: what the ticket pays on the left, the seconds left on the right.
+    text(ctx, `$${ticket.price} + tip`, x + 10, y + h - 21, 12.5, COLORS.tealDark, 'left');
+    text(ctx, `${Math.ceil(ticket.timeLeft)}s`, x + cardW - 8, y + h - 21, 11.5, frac <= 0.25 ? COLORS.red : '#6b5a44', 'right');
+    // The timer you can feel: a bar that drains and reddens along the card's foot.
     ctx.fillStyle = '#e4d7bd';
     rr(ctx, x + 8, y + h - 13, cardW - 16, 7, 3.5); ctx.fill();
     ctx.fillStyle = frac > 0.5 ? COLORS.timerGood : frac > 0.25 ? COLORS.timerMid : COLORS.timerBad;
     if (frac > 0) { rr(ctx, x + 8, y + h - 13, (cardW - 16) * frac, 7, 3.5); ctx.fill(); }
-    text(ctx, `${Math.ceil(ticket.timeLeft)}s`, x + cardW - 8, y + h - 24, 11.5, frac <= 0.25 ? COLORS.red : '#6b5a44', 'right');
   });
   if (state.tickets.length === 0 && state.phase === 'play') {
     text(ctx, 'No orders — breathe. The rush is coming…', 20, 62, 16, '#9fb4ac', 'left', false);
