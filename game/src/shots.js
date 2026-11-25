@@ -41,6 +41,8 @@ function cover() {
   s.fryer = { item: 'potato_cut', t: 3.8 }; // chips ready to lift
   s.boards[0].item = 'tomato';
   s.boards[0].chops = 2; // mid-chop, one press from done
+  s.boards[1].item = 'lettuce';
+  s.boards[1].chops = 1; // a second dish in flight on the far board — no blank panel on the cover
   s.plate = ['fillet_grilled', 'lettuce_cut']; // a Harbour Plate mid-assembly
   s.island.item = 'prawns_grilled'; // grilled prawns resting on the island, mid-route
   s.passDish = 'fillet'; // a finished plate resting on the pass
@@ -56,8 +58,15 @@ function cover() {
 function title() {
   const s = createGame(7);
   s.phase = 'title';
-  s.chef.x = 640;
-  s.chef.y = 596;
+  // Mise en place: the boards are loaded before doors — whole ingredients
+  // resting, no presses yet — so the quiet kitchen behind the menu reads
+  // as a set kitchen, not an unbuilt one.
+  s.boards[0].item = 'tomato';
+  s.boards[1].item = 'lettuce';
+  // Clear of the instruction lines, which cross the room's middle band:
+  // at centre the text cut the cook in half.
+  s.chef.x = 170;
+  s.chef.y = 632;
   return s;
 }
 
